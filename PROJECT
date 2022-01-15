@@ -1,0 +1,15 @@
+domain: jackhoman.com
+layout:
+- go.kubebuilder.io/v3
+projectName: aws-iam-controller
+repo: github.com/johnhoman/aws-iam-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: jackhoman.com
+  kind: IamRole
+  path: github.com/johnhoman/aws-iam-controller/api/v1alpha1
+  version: v1alpha1
+version: "3"
