@@ -17,11 +17,14 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -38,8 +44,71 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
-var k8sClient client.Client
+var k8s client.Client
 var testEnv *envtest.Environment
+
+type EventuallyClient struct {
+	Client client.Client
+}
+
+func (a *EventuallyClient) ExpectCreate(ctx context.Context, obj client.Object) AsyncAssertion {
+	return Eventually(func() error {
+		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
+		err := a.Client.Get(ctx, key, obj)
+		if client.IgnoreNotFound(err) != nil {
+			return err
+		}
+		if apierrors.IsNotFound(err) {
+			err = a.Client.Create(ctx, obj)
+			if err != nil {
+				return err
+			}
+		}
+		return err
+	})
+}
+
+func (a *EventuallyClient) ExpectGet(ctx context.Context, key types.NamespacedName, obj client.Object) AsyncAssertion {
+	return Eventually(func() error {
+		return a.Client.Get(ctx, key, obj)
+	})
+}
+
+func (a *EventuallyClient) ExpectGetWhen(ctx context.Context, key types.NamespacedName, obj client.Object, predicate func(obj client.Object) bool) AsyncAssertion {
+	return Eventually(func() error {
+		err := a.Client.Get(ctx, key, obj)
+		if err != nil {
+			return err
+		}
+		if !predicate(obj) {
+			return errors.New(fmt.Sprintf("predicate failed: %#v", obj))
+		}
+		return nil
+	})
+}
+
+func (a *EventuallyClient) ExpectUpdate(ctx context.Context, obj client.Object) AsyncAssertion {
+	return Eventually(func() error {
+		version := obj.GetResourceVersion()
+		err := a.Client.Update(ctx, obj)
+		if err != nil {
+			return err
+		}
+		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
+		err = a.Client.Get(ctx, key, obj)
+		if err != nil {
+			return err
+		}
+		if obj.GetResourceVersion() != version {
+			return errors.New("waiting for update to propagate")
+		}
+		return nil
+	})
+}
+
+func NewEventuallyClient(client client.Client) *EventuallyClient {
+	return &EventuallyClient{Client: client}
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -58,7 +127,8 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	cfg, err := testEnv.Start()
+	var err error
+	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
@@ -67,10 +137,7 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
-
+	k8s, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 }, 60)
 
 var _ = AfterSuite(func() {

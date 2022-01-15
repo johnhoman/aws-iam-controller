@@ -19,7 +19,7 @@ package aws
 import (
 	"context"
 
-    "github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type IamRoleService interface {
@@ -33,4 +33,3 @@ type IamRoleService interface {
 type IamService interface {
 	IamRoleService
 }
-

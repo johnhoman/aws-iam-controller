@@ -39,14 +39,13 @@ const (
 	AWSAccountId = "012345678912"
 )
 
-
 type IamService struct {
 	// RoleName -> Role
 	Roles map[string]iamtypes.Role
 	// Policies []iamtypes.Policy
 }
 
-func (i* IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
+func (i *IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	out, err := i.GetRole(ctx, in)
 	if err != nil {
@@ -64,7 +63,7 @@ func (i* IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput
 	return &iam.UpdateRoleOutput{}, nil
 }
 
-func (i* IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+func (i *IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
 	re := regexp.MustCompile(`[\w+=,.@-]+`)
 	if !re.MatchString(aws.ToString(params.RoleName)) {
 		return nil, wrap(&iamtypes.InvalidInputException{
@@ -79,7 +78,7 @@ func (i* IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optF
 	return &iam.GetRoleOutput{Role: &role}, nil
 }
 
-func (i* IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
+func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	if _, err := i.GetRole(ctx, in); err == nil {
 		return &iam.CreateRoleOutput{}, wrap(
@@ -120,7 +119,7 @@ func (i* IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput
 	return &iam.CreateRoleOutput{Role: &iamRole}, nil
 }
 
-func (i* IamService) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
+func (i *IamService) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	out, err := i.GetRole(ctx, in)
 	if err != nil {

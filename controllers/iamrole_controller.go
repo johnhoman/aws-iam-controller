@@ -30,7 +30,8 @@ import (
 )
 
 const (
-	Finalizer = "jackhoman.com/finalize-iam-role"
+	Finalizer                    = "jackhoman.com/delete-iam-role"
+	FieldOwner client.FieldOwner = "aws-iam-controller"
 )
 
 // IamRoleReconciler reconciles a IamRole object
@@ -45,10 +46,6 @@ type IamRoleReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the IamRole object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
@@ -62,20 +59,31 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if instance.DeletionTimestamp.IsZero() {
 		if !cu.ContainsFinalizer(instance, Finalizer) {
-			cu.AddFinalizer(instance, Finalizer)
-			patch := &unstructured.Unstructured{}
+			patch := &unstructured.Unstructured{Object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"finalizers": []string{Finalizer},
+				},
+			}}
 			patch.SetName(instance.GetName())
 			patch.SetNamespace(instance.GetNamespace())
-			patch.SetFinalizers(instance.GetFinalizers())
 			patch.SetGroupVersionKind(instance.GroupVersionKind())
-			logger.V(2).Info("adding finalizer")
-			if err := r.Client.Patch(ctx, patch, client.Apply, client.FieldOwner("aws-iam-controller")); err != nil {
+			logger.Info("adding finalizer")
+			if err := r.Client.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// Delete resources
 		logger.Info("Removing IAM Role")
+
+		if cu.ContainsFinalizer(instance, Finalizer) {
+			// how do I remove the finalizer now with a patch?
+			patch := client.MergeFrom(instance.DeepCopy())
+			cu.RemoveFinalizer(instance, Finalizer)
+			if err := r.Client.Patch(ctx, instance, patch, FieldOwner); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	return ctrl.Result{}, nil

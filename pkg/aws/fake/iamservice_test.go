@@ -71,7 +71,7 @@ var _ = Describe("IamService", func() {
 	})
 	It("should get the role", func() {
 		out, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-get-a-role"),
+			RoleName:                 aws.String("should-get-a-role"),
 			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).To(Succeed())
@@ -85,7 +85,7 @@ var _ = Describe("IamService", func() {
 		})
 		Expect(err).To(Succeed())
 		_, err = iamService.UpdateRole(ctx, &iam.UpdateRoleInput{
-			RoleName: aws.String("should-update-the-role"),
+			RoleName:    aws.String("should-update-the-role"),
 			Description: aws.String("A new description"),
 		})
 		out, err := iamService.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String("should-update-the-role")})
