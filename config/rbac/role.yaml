@@ -7,7 +7,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - jackhoman.com
+  - aws.jackhoman.com
   resources:
   - iamroles
   verbs:
@@ -19,13 +19,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - jackhoman.com
+  - aws.jackhoman.com
   resources:
   - iamroles/finalizers
   verbs:
   - update
 - apiGroups:
-  - jackhoman.com
+  - aws.jackhoman.com
   resources:
   - iamroles/status
   verbs:

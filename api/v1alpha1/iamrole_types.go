@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,13 +30,14 @@ type IamRoleSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of IamRole. Edit iamrole_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	ServiceAccounts []corev1.LocalObjectReference `json:"serviceAccounts,omitempty"`
 }
 
 // IamRoleStatus defines the observed state of IamRole
 type IamRoleStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	RoleArn string `json:"arn,omitempty"`
 }
 
 //+kubebuilder:object:root=true

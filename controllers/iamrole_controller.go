@@ -18,15 +18,22 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"net/url"
+	"reflect"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	jackhomancomv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
 const (
@@ -38,11 +45,15 @@ const (
 type IamRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	pkgaws.IamRoleService
+	oidcProviderArn string
+	clusterName     string
 }
 
-//+kubebuilder:rbac:groups=jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=jackhoman.com,resources=iamroles/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=jackhoman.com,resources=iamroles/finalizers,verbs=update
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -52,7 +63,7 @@ type IamRoleReconciler struct {
 func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	instance := &jackhomancomv1alpha1.IamRole{}
+	instance := &v1alpha1.IamRole{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -85,6 +96,49 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 	}
+	name := instance.GetNamespace() + "-" + instance.GetName()
+	logger = logger.WithValues("RoleName", name)
+	logger.Info("reconciling iam role")
+	upstream := &iamtypes.Role{}
+	out, err := r.GetRole(ctx, &iam.GetRoleInput{
+		RoleName: aws.String(name),
+	})
+	if err != nil {
+		if pkgaws.IsNotFound(err) {
+			out, err := r.CreateRole(ctx, &iam.CreateRoleInput{
+				RoleName:                 aws.String(name),
+				AssumeRolePolicyDocument: aws.String("{}"),
+			})
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			*upstream = *out.Role
+		} else {
+			return ctrl.Result{}, err
+		}
+	} else {
+		*upstream = *out.Role
+	}
+
+	rawDoc, err := url.QueryUnescape(aws.ToString(upstream.AssumeRolePolicyDocument))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	current := pkgaws.PolicyDocument{}
+	if err := json.Unmarshal([]byte(rawDoc), &current); err != nil {
+		return ctrl.Result{}, err
+	}
+	doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !reflect.DeepEqual(doc, current) {
+	}
+
+	instance.Status.RoleArn = aws.ToString(upstream.Arn)
+	if err := r.Status().Update(ctx, instance); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -92,6 +146,11 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&jackhomancomv1alpha1.IamRole{}).
+		For(&v1alpha1.IamRole{}).
 		Complete(r)
+}
+
+func roleName(instance *v1alpha1.IamRole) string {
+	name := instance.GetNamespace() + "-" + instance.GetName()
+	return name
 }

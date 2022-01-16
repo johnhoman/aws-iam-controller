@@ -18,7 +18,6 @@ package aws
 
 import (
 	"context"
-
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
@@ -27,6 +26,8 @@ type IamRoleService interface {
 	GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
 	UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error)
 	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
+
+	UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error)
 }
 
 // IamService interfaces with an upstream AWS account to create iam resources

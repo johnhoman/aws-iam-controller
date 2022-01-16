@@ -19,18 +19,19 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/google/uuid"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("IamRoleController", func() {
@@ -40,9 +41,10 @@ var _ = Describe("IamRoleController", func() {
 	var ns *corev1.Namespace
 	var k8sClient client.Client
 	var c *EventuallyClient
+	var iamService pkgaws.IamService
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
-
+		iamService = newIamService()
 		ns = &corev1.Namespace{}
 		ns.SetName("testspace-" + uuid.New().String()[:8])
 
@@ -59,8 +61,14 @@ var _ = Describe("IamRoleController", func() {
 			Namespace:              ns.GetName(),
 		})
 		Expect(err).Should(Succeed())
-		err = (&IamRoleReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr)
-		Expect(err).Should(Succeed())
+		Expect((&IamRoleReconciler{
+			Client:         mgr.GetClient(),
+			Scheme:         mgr.GetScheme(),
+			IamRoleService: iamService,
+			// TODO ():
+			oidcProviderArn: "arn:aws:iam::012345678912:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E",
+			clusterName:     "",
+		}).SetupWithManager(mgr)).Should(Succeed())
 		go func() {
 			defer GinkgoRecover()
 			Expect(mgr.Start(ctx)).ToNot(HaveOccurred(), "failed to run manager")
@@ -141,5 +149,20 @@ var _ = Describe("IamRoleController", func() {
 		Expect(instance.Finalizers).Should(ContainElement("keep"))
 		Expect(instance.Finalizers).ShouldNot(ContainElement(Finalizer))
 		Expect(instance.ManagedFields[0].Manager).ToNot(Equal("aws-iam-controller"))
+	})
+	It("Should create the upstream role", func() {
+		instance := &v1alpha1.IamRole{}
+		instance.SetName("app-role")
+		c.ExpectCreate(ctx, instance).Should(Succeed())
+
+		instance = &v1alpha1.IamRole{}
+		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
+			return instance.Status.RoleArn != ""
+		}).ShouldNot(HaveOccurred())
+
+		_, err := iamService.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String(roleName(instance)),
+		})
+		Expect(err).ShouldNot(HaveOccurred())
 	})
 })

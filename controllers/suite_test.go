@@ -20,6 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -34,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	//+kubebuilder:scaffold:imports
@@ -49,6 +53,16 @@ var testEnv *envtest.Environment
 
 type EventuallyClient struct {
 	Client client.Client
+}
+
+func newIamService() aws.IamService {
+	if _, ok := os.LookupEnv("AWS_IAM_CONTROLLER_AWS_LIVE"); ok {
+		cfg, err := config.LoadDefaultConfig(context.TODO())
+		Expect(err).ShouldNot(HaveOccurred())
+		c := iam.NewFromConfig(cfg)
+		return c
+	}
+	return fake.NewIamService()
 }
 
 func (a *EventuallyClient) ExpectCreate(ctx context.Context, obj client.Object) AsyncAssertion {
@@ -136,6 +150,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
+
+	// This should be swapped out in CI with real tests against real AWS
+	// but this is fine for now
 
 	k8s, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 }, 60)

@@ -17,8 +17,11 @@ limitations under the License.
 package fake_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 	"net/http"
 	"net/url"
 
@@ -32,7 +35,7 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
 )
 
-var _ = Describe("IamService", func() {
+var _ = Describe("IamRoleService", func() {
 	var (
 		iamService *fake.IamService
 	)
@@ -42,26 +45,41 @@ var _ = Describe("IamService", func() {
 
 	It("should create a role", func() {
 		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-create-a-role"),
+			RoleName:                 aws.String("should-create-a-role"),
+			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).To(Succeed())
 	})
 	It("should return a conflict when a role exists", func() {
 		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-create-a-conflict"),
+			RoleName:                 aws.String("should-create-a-conflict"),
+			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).To(Succeed())
 		_, err = iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-create-a-conflict"),
+			RoleName:                 aws.String("should-create-a-conflict"),
+			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).ToNot(Succeed())
 		var re *awshttp.ResponseError
 		Expect(errors.As(err, &re))
 		Expect(re.Response.StatusCode).To(Equal(http.StatusConflict))
 	})
+	It("should return not found when a role doesn't exist", func() {
+		_, err := iamService.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String("role-does-not-exist"),
+		})
+		Expect(err).ToNot(Succeed())
+		var re *smithy.OperationError
+		Expect(errors.As(err, &re))
+		Expect(re.Unwrap().(*awshttp.ResponseError).HTTPStatusCode()).To(Equal(http.StatusNotFound))
+		er := &iamtypes.NoSuchEntityException{}
+		Expect(errors.As(err, &er)).To(BeTrue())
+	})
 	It("should delete a role", func() {
 		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-delete-a-role"),
+			RoleName:                 aws.String("should-delete-a-role"),
+			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).To(Succeed())
 		_, err = iamService.DeleteRole(ctx, &iam.DeleteRoleInput{
@@ -81,7 +99,8 @@ var _ = Describe("IamService", func() {
 	})
 	It("should update the role", func() {
 		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
-			RoleName: aws.String("should-update-the-role"),
+			RoleName:                 aws.String("should-update-the-role"),
+			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).To(Succeed())
 		_, err = iamService.UpdateRole(ctx, &iam.UpdateRoleInput{
@@ -90,5 +109,48 @@ var _ = Describe("IamService", func() {
 		})
 		out, err := iamService.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String("should-update-the-role")})
 		Expect(aws.ToString(out.Role.Description)).To(Equal("A new description"))
+	})
+	It("should raise an error when a policy document isn't provided to create", func() {
+		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
+			RoleName: aws.String("should-update-the-role"),
+		})
+		Expect(err).Should(HaveOccurred())
+		oe := &smithy.InvalidParamsError{}
+		Expect(errors.As(err, &oe)).To(BeTrue())
+	})
+	It("should update an assume role policy document", func() {
+		_, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
+			RoleName:                 aws.String("should-update-assume-role-policy-document"),
+			AssumeRolePolicyDocument: aws.String("{}"),
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+
+		doc := map[string]interface{}{
+			"Version": "2012-10-17",
+			"Statement": []interface{}{
+				map[string]interface{}{
+					"Effect":    "Allow",
+					"Principal": map[string]interface{}{"AWS": "arn:aws:iam::111122223333:root"},
+					"Action":    "sts:AssumeRole",
+				},
+			},
+		}
+
+		raw, err := json.Marshal(doc)
+		Expect(err).ShouldNot(HaveOccurred())
+		document := string(raw)
+
+		_, err = iamService.UpdateAssumeRolePolicy(ctx, &iam.UpdateAssumeRolePolicyInput{
+			RoleName:       aws.String("should-update-assume-role-policy-document"),
+			PolicyDocument: aws.String(document),
+		})
+
+		out, err := iamService.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String("should-update-assume-role-policy-document"),
+		})
+		current, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(current).To(Equal(document))
 	})
 })

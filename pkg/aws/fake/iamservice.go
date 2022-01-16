@@ -19,6 +19,7 @@ package fake
 import (
 	"context"
 	"fmt"
+	"github.com/aws/smithy-go"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -45,6 +46,18 @@ type IamService struct {
 	// Policies []iamtypes.Policy
 }
 
+func (i *IamService) UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
+	in := &iam.GetRoleInput{RoleName: params.RoleName}
+	_, err := i.GetRole(ctx, in)
+	if err != nil {
+		return &iam.UpdateAssumeRolePolicyOutput{}, err
+	}
+	role := i.Roles[aws.ToString(params.RoleName)]
+	role.AssumeRolePolicyDocument = aws.String(url.QueryEscape(*params.PolicyDocument))
+	i.Roles[aws.ToString(params.RoleName)] = role
+	return &iam.UpdateAssumeRolePolicyOutput{}, nil
+}
+
 func (i *IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	out, err := i.GetRole(ctx, in)
@@ -68,12 +81,16 @@ func (i *IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optF
 	if !re.MatchString(aws.ToString(params.RoleName)) {
 		return nil, wrap(&iamtypes.InvalidInputException{
 			Message: aws.String("invalid role name"),
-		}, &http.Response{StatusCode: http.StatusBadRequest})
+		}, &http.Response{StatusCode: http.StatusBadRequest}, "GetRole")
 	}
 
 	role, ok := i.Roles[aws.ToString(params.RoleName)]
 	if !ok {
-		return &iam.GetRoleOutput{}, wrap(&iamtypes.NoSuchEntityException{}, &http.Response{StatusCode: http.StatusNotFound})
+		return &iam.GetRoleOutput{}, wrap(
+			&iamtypes.NoSuchEntityException{},
+			&http.Response{StatusCode: http.StatusNotFound},
+			"GetRole",
+		)
 	}
 	return &iam.GetRoleOutput{Role: &role}, nil
 }
@@ -84,8 +101,13 @@ func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput
 		return &iam.CreateRoleOutput{}, wrap(
 			&iamtypes.EntityAlreadyExistsException{},
 			&http.Response{StatusCode: http.StatusConflict},
+			"CreateRole",
 		)
 	}
+	if params.AssumeRolePolicyDocument == nil {
+		return &iam.CreateRoleOutput{}, &smithy.OperationError{Err: &smithy.InvalidParamsError{}}
+	}
+
 	arn := fmt.Sprintf("arn:aws:iam::%s:role", AWSAccountId)
 	if params.Path != nil {
 		path := aws.ToString(params.Path)
@@ -94,6 +116,7 @@ func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput
 				return &iam.CreateRoleOutput{}, wrap(
 					&iamtypes.InvalidInputException{},
 					&http.Response{StatusCode: http.StatusBadRequest},
+					"CreateRole",
 				)
 			}
 			arn = arn + "/" + strings.Trim(path, "/")
@@ -149,13 +172,14 @@ func randStringSuffix(p string) string {
 	return p + string(b)
 }
 
-func wrap(err error, res *http.Response) error {
-	return &awshttp.ResponseError{
-		ResponseError: &transporthttp.ResponseError{
-			Response: &transporthttp.Response{
-				Response: res,
+func wrap(err error, res *http.Response, opName string) error {
+	return &smithy.OperationError{
+		OperationName: opName,
+		Err: &awshttp.ResponseError{
+			ResponseError: &transporthttp.ResponseError{
+				Response: &transporthttp.Response{Response: res},
+				Err:      err,
 			},
-			Err: err,
 		},
 	}
 }
