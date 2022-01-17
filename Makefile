@@ -58,7 +58,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	go test ./... -coverprofile cover.out
+	ACK_GINKGO_DEPRECATIONS=1.16.4 go test ./... -coverprofile cover.out
 
 ##@ Build
 

@@ -17,72 +17,59 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
+	"errors"
 	"fmt"
+	"net/url"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/google/uuid"
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/controller-tools/manager"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("IamRoleController", func() {
-	var mgr ctrl.Manager
-	var ctx context.Context
-	var cancel context.CancelFunc
-	var ns *corev1.Namespace
-	var k8sClient client.Client
-	var c *EventuallyClient
+	var mgr manager.IntegrationTest
 	var iamService pkgaws.IamService
+	var issuerUrl string
+	var oidcProviderArn string
 	BeforeEach(func() {
-		ctx, cancel = context.WithCancel(context.Background())
+		issuerUrl = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E"
+		oidcProviderArn = fmt.Sprintf("arn:aws:iam::012345678912:oidc-provider/%s", issuerUrl)
 		iamService = newIamService()
-		ns = &corev1.Namespace{}
-		ns.SetName("testspace-" + uuid.New().String()[:8])
 
-		k8sClient = client.NewNamespacedClient(k8s, ns.GetName())
-		c = NewEventuallyClient(k8sClient)
-		NewEventuallyClient(k8s).ExpectCreate(ctx, ns).Should(Succeed())
+		mgr = manager.IntegrationTestBuilder().
+			WithScheme(scheme.Scheme).
+			Complete(cfg)
 
-		var err error
-		mgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:                 scheme.Scheme,
-			LeaderElection:         false,
-			MetricsBindAddress:     "0",
-			HealthProbeBindAddress: "0",
-			Namespace:              ns.GetName(),
-		})
-		Expect(err).Should(Succeed())
 		Expect((&IamRoleReconciler{
-			Client:         mgr.GetClient(),
-			Scheme:         mgr.GetScheme(),
-			IamRoleService: iamService,
-			// TODO ():
-			oidcProviderArn: "arn:aws:iam::012345678912:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E",
-			clusterName:     "",
+			Client:          mgr.GetClient(),
+			Scheme:          mgr.GetScheme(),
+			IamRoleService:  iamService,
+			oidcProviderArn: oidcProviderArn,
+			clusterName:     "controller.test",
 		}).SetupWithManager(mgr)).Should(Succeed())
-		go func() {
-			defer GinkgoRecover()
-			Expect(mgr.Start(ctx)).ToNot(HaveOccurred(), "failed to run manager")
-		}()
+		mgr.StartManager()
 	})
-	AfterEach(func() { cancel() })
+	AfterEach(func() {mgr.StopManager()})
 	It("Adds a finalizer", func() {
 		instance := &v1alpha1.IamRole{}
 		instance.SetName("adds-a-finalizer")
 		instance.SetFinalizers([]string{"keep"})
-		c.ExpectCreate(ctx, instance).Should(Succeed())
+		mgr.Expect().Create(instance).Should(Succeed())
 
 		instance = &v1alpha1.IamRole{}
-		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "adds-a-finalizer"}, instance, func(obj client.Object) bool {
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "adds-a-finalizer"}, instance, func(obj client.Object) bool {
 			if len(obj.GetFinalizers()) > 1 {
 				return true
 			}
@@ -107,13 +94,13 @@ var _ = Describe("IamRoleController", func() {
 		instance := &v1alpha1.IamRole{}
 		instance.SetName("adds-a-finalizer")
 		instance.SetFinalizers([]string{"keep", Finalizer})
-		c.ExpectCreate(ctx, instance).Should(Succeed())
+		mgr.Eventually().Create(instance).Should(Succeed())
 		Expect(instance.Finalizers).Should(And(ContainElement(Finalizer), ContainElement("keep")))
 		Expect(instance.ManagedFields).To(HaveLen(1))
 		Expect(instance.ManagedFields[0].Manager).ToNot(Equal("aws-iam-controller"))
 
 		instance = &v1alpha1.IamRole{}
-		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "adds-a-finalizer"}, instance, func(obj client.Object) bool {
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "adds-a-finalizer"}, instance, func(obj client.Object) bool {
 			return len(obj.GetManagedFields()) > 1
 		}).Should(Succeed())
 		Expect(instance.Finalizers).Should(And(ContainElement(Finalizer), ContainElement("keep")))
@@ -125,10 +112,10 @@ var _ = Describe("IamRoleController", func() {
 		instance := &v1alpha1.IamRole{}
 		instance.SetName("remove-a-finalizer")
 		instance.SetFinalizers([]string{"keep"})
-		c.ExpectCreate(ctx, instance).Should(Succeed())
+		mgr.Eventually().Create(instance).Should(Succeed())
 
 		instance = &v1alpha1.IamRole{}
-		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
 			if len(obj.GetFinalizers()) > 1 {
 				return true
 			}
@@ -137,10 +124,10 @@ var _ = Describe("IamRoleController", func() {
 
 		instance = &v1alpha1.IamRole{}
 		instance.SetName("remove-a-finalizer")
-		Expect(k8sClient.Delete(ctx, instance)).Should(Succeed())
+		mgr.Expect().Delete(instance).Should(Succeed())
 
 		instance = &v1alpha1.IamRole{}
-		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
 			if len(obj.GetFinalizers()) == 1 {
 				return true
 			}
@@ -150,19 +137,139 @@ var _ = Describe("IamRoleController", func() {
 		Expect(instance.Finalizers).ShouldNot(ContainElement(Finalizer))
 		Expect(instance.ManagedFields[0].Manager).ToNot(Equal("aws-iam-controller"))
 	})
+	It("Should delete the resource and remove the finalizer", func() {
+		instance := &v1alpha1.IamRole{}
+		instance.SetName("remove-a-finalizer")
+		instance.SetFinalizers([]string{"keep"})
+
+		_, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		oe := &iamtypes.NoSuchEntityException{}
+		Expect(errors.As(err, &oe)).To(BeTrue())
+
+		mgr.Eventually().Create(instance).Should(Succeed())
+
+		instance = &v1alpha1.IamRole{}
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
+			if len(obj.GetFinalizers()) > 1 {
+				return true
+			}
+			return false
+		}).Should(Succeed())
+		Expect(instance.Finalizers).Should(ContainElement(Finalizer))
+
+		_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		Expect(err).ShouldNot(HaveOccurred())
+
+		instance = &v1alpha1.IamRole{}
+		instance.SetName("remove-a-finalizer")
+		mgr.Expect().Delete(instance).Should(Succeed())
+
+		instance = &v1alpha1.IamRole{}
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "remove-a-finalizer"}, instance, func(obj client.Object) bool {
+			return len(obj.GetFinalizers()) == 1
+		}).Should(Succeed())
+		Expect(instance.Finalizers).Should(ContainElement("keep"))
+		Expect(instance.Finalizers).ShouldNot(ContainElement(Finalizer))
+		Expect(instance.ManagedFields[0].Manager).ToNot(Equal("aws-iam-controller"))
+		Consistently(func() bool {
+			_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+			oe = &iamtypes.NoSuchEntityException{}
+			return errors.As(err, &oe)
+		}).Should(BeTrue())
+	})
 	It("Should create the upstream role", func() {
 		instance := &v1alpha1.IamRole{}
 		instance.SetName("app-role")
-		c.ExpectCreate(ctx, instance).Should(Succeed())
+		mgr.Eventually().Create(instance).Should(Succeed())
 
 		instance = &v1alpha1.IamRole{}
-		c.ExpectGetWhen(ctx, types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
 			return instance.Status.RoleArn != ""
 		}).ShouldNot(HaveOccurred())
 
-		_, err := iamService.GetRole(ctx, &iam.GetRoleInput{
+		_, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{
 			RoleName: aws.String(roleName(instance)),
 		})
 		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Should update the policy document", func() {
+		instance := &v1alpha1.IamRole{}
+		instance.SetName("app-role")
+		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
+			Name: "default",
+		}}
+		mgr.Eventually().Create(instance).Should(Succeed())
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
+			return instance.Status.RoleArn != ""
+		}).ShouldNot(HaveOccurred())
+
+		out, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		Expect(err).ShouldNot(HaveOccurred())
+		policy, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+		doc := &pkgaws.PolicyDocument{}
+		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
+		Expect(doc.Statement).To(HaveLen(1))
+		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
+			fmt.Sprintf("%s:sub", issuerUrl),
+			fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
+		))
+
+		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
+			Name: "webapp-sa",
+		}}
+		mgr.Eventually().Update(instance).Should(Succeed())
+
+		out, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		Expect(err).ShouldNot(HaveOccurred())
+		policy, err = url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+		doc = &pkgaws.PolicyDocument{}
+		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
+		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
+			fmt.Sprintf("%s:sub", issuerUrl),
+			fmt.Sprintf("system:serviceaccount:%s:webapp-sa", instance.GetNamespace()),
+		))
+		Expect(doc.Statement).To(HaveLen(1))
+	})
+	It("Should update add a service account to an existing policy", func() {
+		instance := &v1alpha1.IamRole{}
+		instance.SetName("app-role")
+		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
+			Name: "default",
+		}}
+		mgr.Eventually().Create(instance).Should(Succeed())
+		mgr.Eventually().GetWhen(types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
+			return instance.Status.RoleArn != ""
+		}).ShouldNot(HaveOccurred())
+
+		out, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		Expect(err).ShouldNot(HaveOccurred())
+		policy, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+		doc := &pkgaws.PolicyDocument{}
+		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
+		Expect(doc.Statement).To(HaveLen(1))
+		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
+			fmt.Sprintf("%s:sub", issuerUrl),
+			fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
+		))
+
+		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{
+			{Name: "webapp-sa"},
+			{Name: "default"},
+		}
+		mgr.Eventually().Update(instance).Should(Succeed())
+
+		out, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		Expect(err).ShouldNot(HaveOccurred())
+		policy, err = url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+		doc = &pkgaws.PolicyDocument{}
+		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
+		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
+			fmt.Sprintf("%s:sub", issuerUrl),
+			[]interface{}{
+				fmt.Sprintf("system:serviceaccount:%s:webapp-sa", instance.GetNamespace()),
+				fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
+			},
+		))
+		Expect(doc.Statement).To(HaveLen(1))
 	})
 })

@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -41,12 +42,15 @@ const (
 )
 
 type IamService struct {
+	sync.Mutex
 	// RoleName -> Role
 	Roles map[string]iamtypes.Role
 	// Policies []iamtypes.Policy
 }
 
 func (i *IamService) UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	_, err := i.GetRole(ctx, in)
 	if err != nil {
@@ -59,6 +63,8 @@ func (i *IamService) UpdateAssumeRolePolicy(ctx context.Context, params *iam.Upd
 }
 
 func (i *IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
 	in := &iam.GetRoleInput{RoleName: params.RoleName}
 	out, err := i.GetRole(ctx, in)
 	if err != nil {
@@ -138,6 +144,8 @@ func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput
 		PermissionsBoundaryArn: params.PermissionsBoundary,
 	}
 
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
 	i.Roles[aws.ToString(iamRole.RoleName)] = iamRole
 	return &iam.CreateRoleOutput{Role: &iamRole}, nil
 }
@@ -148,6 +156,8 @@ func (i *IamService) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput
 	if err != nil {
 		return &iam.DeleteRoleOutput{}, err
 	}
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
 	delete(i.Roles, aws.ToString(out.Role.RoleName))
 	// TODO: delete conflicts
 	return &iam.DeleteRoleOutput{}, nil

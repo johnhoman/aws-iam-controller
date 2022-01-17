@@ -18,28 +18,53 @@ package controllers
 
 import (
 	"context"
-	"net/url"
-	"reflect"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+	"net/url"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
 
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
 const (
+	Me                           = "aws-iam-controller"
 	Finalizer                    = "jackhoman.com/delete-iam-role"
-	FieldOwner client.FieldOwner = "aws-iam-controller"
+	FieldOwner client.FieldOwner = Me
 )
+
+var (
+	upstreamPolicyDocumentInvalid = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: strings.ReplaceAll(Me, "-", "_"),
+		Subsystem: "reconciler",
+		Name:      "upstream_policy_document_invalid",
+		Help:      "The policy document retrieved from aws for this role is invalid",
+	}, []string{"roleName"})
+)
+
+func init() {
+	prometheus.MustRegister(upstreamPolicyDocumentInvalid)
+}
+
+type Notifier interface {
+	InvalidPolicyDocument(instance *v1alpha1.IamRole)
+}
+
+type notifier struct{}
+
+func (n *notifier) InvalidPolicyDocument(instance *v1alpha1.IamRole) {
+
+}
 
 // IamRoleReconciler reconciles a IamRole object
 type IamRoleReconciler struct {
@@ -62,40 +87,61 @@ type IamRoleReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	k8 := client.NewNamespacedClient(r.Client, req.Namespace)
 
 	instance := &v1alpha1.IamRole{}
-	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := k8.Get(ctx, req.NamespacedName, instance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if instance.DeletionTimestamp.IsZero() {
-		if !cu.ContainsFinalizer(instance, Finalizer) {
-			patch := &unstructured.Unstructured{Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"finalizers": []string{Finalizer},
-				},
-			}}
-			patch.SetName(instance.GetName())
-			patch.SetNamespace(instance.GetNamespace())
-			patch.SetGroupVersionKind(instance.GroupVersionKind())
-			logger.Info("adding finalizer")
-			if err := r.Client.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
+	if !instance.DeletionTimestamp.IsZero() {
 		// Delete resources
 		logger.Info("Removing IAM Role")
+		out, err := r.IamRoleService.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		if err != nil {
+			if pkgaws.IsNotFound(err) {
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
+		} else {
+			if _, err := r.IamRoleService.DeleteRole(ctx, &iam.DeleteRoleInput{RoleName: out.Role.RoleName}); err != nil {
+				return ctrl.Result{}, err
+			}
+			logger.Info("Removed upstream role", "arn", aws.ToString(out.Role.Arn))
+		}
 
 		if cu.ContainsFinalizer(instance, Finalizer) {
-			// how do I remove the finalizer now with a patch?
+			// Need to establish ownership above to remove this finalizer if it somehow
+			// already exists on the object
 			patch := client.MergeFrom(instance.DeepCopy())
 			cu.RemoveFinalizer(instance, Finalizer)
-			if err := r.Client.Patch(ctx, instance, patch, FieldOwner); err != nil {
+			if err := k8.Patch(ctx, instance, patch, FieldOwner); err != nil {
+				logger.Error(err, "unable to patch finalizers")
 				return ctrl.Result{}, err
 			}
 		}
+		return ctrl.Result{}, nil
 	}
+	// If this finalizer already exists on the object but
+	// isn't owned by this controller this prevents it from being owned
+	// TODO: fix this
+	if !cu.ContainsFinalizer(instance, Finalizer) {
+		patch := &unstructured.Unstructured{Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"finalizers": []string{Finalizer},
+			},
+		}}
+		patch.SetName(instance.GetName())
+		patch.SetGroupVersionKind(instance.GroupVersionKind())
+		logger.Info("adding finalizer")
+		if err := k8.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := k8.Get(ctx, req.NamespacedName, instance); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	name := instance.GetNamespace() + "-" + instance.GetName()
 	logger = logger.WithValues("RoleName", name)
 	logger.Info("reconciling iam role")
@@ -105,9 +151,18 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 	if err != nil {
 		if pkgaws.IsNotFound(err) {
+			doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			raw, err := json.Marshal(doc)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			policy := string(raw)
 			out, err := r.CreateRole(ctx, &iam.CreateRoleInput{
 				RoleName:                 aws.String(name),
-				AssumeRolePolicyDocument: aws.String("{}"),
+				AssumeRolePolicyDocument: aws.String(policy),
 			})
 			if err != nil {
 				return ctrl.Result{}, err
@@ -126,6 +181,9 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	current := pkgaws.PolicyDocument{}
 	if err := json.Unmarshal([]byte(rawDoc), &current); err != nil {
+		// This would mean the upstream policy document isn't valid which isn't really feasible
+		// so probably the PolicyDocument class is broken
+		upstreamPolicyDocumentInvalid.WithLabelValues(aws.ToString(upstream.RoleName)).Inc()
 		return ctrl.Result{}, err
 	}
 	doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
@@ -133,10 +191,22 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	if !reflect.DeepEqual(doc, current) {
+		raw, err := json.Marshal(doc)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		policy := string(raw)
+		_, err = r.IamRoleService.UpdateAssumeRolePolicy(ctx, &iam.UpdateAssumeRolePolicyInput{
+			RoleName:       upstream.RoleName,
+			PolicyDocument: aws.String(policy),
+		})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	instance.Status.RoleArn = aws.ToString(upstream.Arn)
-	if err := r.Status().Update(ctx, instance); err != nil {
+	if err := k8.Status().Update(ctx, instance); err != nil {
 		return ctrl.Result{}, err
 	}
 

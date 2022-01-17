@@ -86,6 +86,7 @@ var _ = Describe("IamRoleService", func() {
 			RoleName: aws.String("should-delete-a-role"),
 		})
 		Expect(err).To(Succeed())
+		Expect(iamService.Roles).ToNot(HaveKey("should-delete-a-role"))
 	})
 	It("should get the role", func() {
 		out, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{

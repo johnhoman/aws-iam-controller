@@ -18,8 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws"
@@ -28,8 +26,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,65 +59,6 @@ func newIamService() aws.IamService {
 		return c
 	}
 	return fake.NewIamService()
-}
-
-func (a *EventuallyClient) ExpectCreate(ctx context.Context, obj client.Object) AsyncAssertion {
-	return Eventually(func() error {
-		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
-		err := a.Client.Get(ctx, key, obj)
-		if client.IgnoreNotFound(err) != nil {
-			return err
-		}
-		if apierrors.IsNotFound(err) {
-			err = a.Client.Create(ctx, obj)
-			if err != nil {
-				return err
-			}
-		}
-		return err
-	})
-}
-
-func (a *EventuallyClient) ExpectGet(ctx context.Context, key types.NamespacedName, obj client.Object) AsyncAssertion {
-	return Eventually(func() error {
-		return a.Client.Get(ctx, key, obj)
-	})
-}
-
-func (a *EventuallyClient) ExpectGetWhen(ctx context.Context, key types.NamespacedName, obj client.Object, predicate func(obj client.Object) bool) AsyncAssertion {
-	return Eventually(func() error {
-		err := a.Client.Get(ctx, key, obj)
-		if err != nil {
-			return err
-		}
-		if !predicate(obj) {
-			return errors.New(fmt.Sprintf("predicate failed: %#v", obj))
-		}
-		return nil
-	})
-}
-
-func (a *EventuallyClient) ExpectUpdate(ctx context.Context, obj client.Object) AsyncAssertion {
-	return Eventually(func() error {
-		version := obj.GetResourceVersion()
-		err := a.Client.Update(ctx, obj)
-		if err != nil {
-			return err
-		}
-		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
-		err = a.Client.Get(ctx, key, obj)
-		if err != nil {
-			return err
-		}
-		if obj.GetResourceVersion() != version {
-			return errors.New("waiting for update to propagate")
-		}
-		return nil
-	})
-}
-
-func NewEventuallyClient(client client.Client) *EventuallyClient {
-	return &EventuallyClient{Client: client}
 }
 
 func TestAPIs(t *testing.T) {
