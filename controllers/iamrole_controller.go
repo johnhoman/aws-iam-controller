@@ -21,6 +21,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,46 +33,94 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
 const (
-	Me                           = "aws-iam-controller"
-	Finalizer                    = "jackhoman.com/delete-iam-role"
-	FieldOwner client.FieldOwner = Me
+	PrometheusNamespace                   = "aws_iam_controller"
+	PrometheusSubsystem                   = "role_reconciler"
+	Finalizer                             = "jackhoman.com/delete-iam-role"
+	FieldOwner          client.FieldOwner = "aws-iam-controller"
 )
 
 var (
 	upstreamPolicyDocumentInvalid = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: strings.ReplaceAll(Me, "-", "_"),
-		Subsystem: "reconciler",
-		Name:      "upstream_policy_document_invalid",
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "role_upstream_policy_document_invalid",
 		Help:      "The policy document retrieved from aws for this role is invalid",
+	}, []string{"roleName"})
+	roleCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "role_created",
+		Help:      "Created a new aws iam role",
+	}, []string{"roleName"})
+	roleUpdated = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "role_updated",
+		Help:      "Updated the aws iam role",
+	}, []string{"roleName"})
+	roleDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "role_deleted",
+		Help:      "Deleted an existing aws iam role",
+	}, []string{"roleName"})
+	roleTrustPolicyUpdated = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "role_trust_policy_updated",
+		Help:      "Deleted an existing aws iam role",
 	}, []string{"roleName"})
 )
 
 func init() {
 	prometheus.MustRegister(upstreamPolicyDocumentInvalid)
+	prometheus.MustRegister(roleCreated)
+	prometheus.MustRegister(roleUpdated)
+	prometheus.MustRegister(roleDeleted)
+	prometheus.MustRegister(roleTrustPolicyUpdated)
 }
 
 type Notifier interface {
-	InvalidPolicyDocument(instance *v1alpha1.IamRole)
+	InvalidPolicyDocument(roleName string)
+	Created(roleName string)
+	Updated(roleName string)
+	Deleted(roleName string)
+	TrustPolicyUpdated(roleName string)
 }
 
 type notifier struct{}
 
-func (n *notifier) InvalidPolicyDocument(instance *v1alpha1.IamRole) {
-
+func (n *notifier) TrustPolicyUpdated(roleName string) {
+	roleTrustPolicyUpdated.WithLabelValues(roleName).Inc()
 }
+
+func (n *notifier) Created(roleName string) {
+	roleCreated.WithLabelValues(roleName).Inc()
+}
+
+func (n *notifier) Updated(roleName string) {
+	roleUpdated.WithLabelValues(roleName).Inc()
+}
+
+func (n *notifier) Deleted(roleName string) {
+	roleDeleted.WithLabelValues(roleName).Inc()
+}
+
+func (n *notifier) InvalidPolicyDocument(roleName string) {
+	upstreamPolicyDocumentInvalid.WithLabelValues(roleName).Inc()
+}
+
+var _ Notifier = &notifier{}
 
 // IamRoleReconciler reconciles a IamRole object
 type IamRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	notify Notifier
 	pkgaws.IamRoleService
 	oidcProviderArn string
 	clusterName     string
@@ -107,6 +157,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if _, err := r.IamRoleService.DeleteRole(ctx, &iam.DeleteRoleInput{RoleName: out.Role.RoleName}); err != nil {
 				return ctrl.Result{}, err
 			}
+			r.notify.Deleted(aws.ToString(out.Role.RoleName))
 			logger.Info("Removed upstream role", "arn", aws.ToString(out.Role.Arn))
 		}
 
@@ -167,6 +218,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			r.notify.Created(aws.ToString(out.Role.RoleName))
 			*upstream = *out.Role
 		} else {
 			return ctrl.Result{}, err
@@ -183,7 +235,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := json.Unmarshal([]byte(rawDoc), &current); err != nil {
 		// This would mean the upstream policy document isn't valid which isn't really feasible
 		// so probably the PolicyDocument class is broken
-		upstreamPolicyDocumentInvalid.WithLabelValues(aws.ToString(upstream.RoleName)).Inc()
+		r.notify.InvalidPolicyDocument(aws.ToString(upstream.RoleName))
 		return ctrl.Result{}, err
 	}
 	doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
@@ -203,6 +255,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		r.notify.TrustPolicyUpdated(aws.ToString(upstream.RoleName))
 	}
 
 	instance.Status.RoleArn = aws.ToString(upstream.Arn)

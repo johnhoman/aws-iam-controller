@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -44,12 +43,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
-var k8s client.Client
 var testEnv *envtest.Environment
-
-type EventuallyClient struct {
-	Client client.Client
-}
 
 func newIamService() aws.IamService {
 	if _, ok := os.LookupEnv("AWS_IAM_CONTROLLER_AWS_LIVE"); ok {
@@ -90,8 +84,6 @@ var _ = BeforeSuite(func() {
 
 	// This should be swapped out in CI with real tests against real AWS
 	// but this is fine for now
-
-	k8s, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 }, 60)
 
 var _ = AfterSuite(func() {

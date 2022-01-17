@@ -55,13 +55,14 @@ var _ = Describe("IamRoleController", func() {
 		Expect((&IamRoleReconciler{
 			Client:          mgr.GetClient(),
 			Scheme:          mgr.GetScheme(),
+			notify:          &notifier{},
 			IamRoleService:  iamService,
 			oidcProviderArn: oidcProviderArn,
 			clusterName:     "controller.test",
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
 	})
-	AfterEach(func() {mgr.StopManager()})
+	AfterEach(func() { mgr.StopManager() })
 	It("Adds a finalizer", func() {
 		instance := &v1alpha1.IamRole{}
 		instance.SetName("adds-a-finalizer")
