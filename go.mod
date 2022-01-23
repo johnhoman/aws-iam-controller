@@ -2,9 +2,7 @@ module github.com/johnhoman/aws-iam-controller
 
 go 1.17
 
-replace (
-    github.com/johnhoman/controller-tools => ../controller-tools
-)
+replace github.com/johnhoman/controller-tools => ../controller-tools
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.13.0

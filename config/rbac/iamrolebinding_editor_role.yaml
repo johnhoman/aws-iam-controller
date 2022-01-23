@@ -1,0 +1,24 @@
+# permissions for end users to edit iamrolebindings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: iamrolebinding-editor-role
+rules:
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iamrolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iamrolebindings/status
+  verbs:
+  - get

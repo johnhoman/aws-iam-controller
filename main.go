@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	"github.com/johnhoman/aws-iam-controller/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -45,6 +46,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(awsv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -87,6 +89,13 @@ func main() {
 	}
 	if err = (&v1alpha1.IamRole{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "IamRole")
+		os.Exit(1)
+	}
+	if err = (&controllers.IamRoleBindingReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "IamRoleBinding")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
