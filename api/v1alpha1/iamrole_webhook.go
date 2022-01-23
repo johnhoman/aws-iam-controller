@@ -17,10 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -51,21 +48,7 @@ var _ webhook.Validator = &IamRole{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *IamRole) ValidateCreate() error {
 	iamrolelog.Info("validate create", "name", r.Name)
-
-	var errs field.ErrorList
-
-	if r.Spec.ServiceAccounts == nil || len(r.Spec.ServiceAccounts) == 0 {
-		errs = append(errs, field.Invalid(
-			field.NewPath("spec").Child("serviceAccounts"),
-			r.Spec.ServiceAccounts,
-			"Must name service accounts to establish upstream iam trust policy document",
-		))
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	grp := schema.GroupKind{Group: GroupVersion.Group, Kind: r.Kind}
-	return apierrors.NewInvalid(grp, r.GetName(), errs)
+	return nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type

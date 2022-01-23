@@ -18,16 +18,12 @@ package controllers
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
-	"net/url"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -120,10 +116,9 @@ type IamRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	notify Notifier
-	pkgaws.IamRoleService
-	oidcProviderArn string
-	clusterName     string
+	notify        Notifier
+	roleService   iamrole.Interface
+	defaultPolicy string
 }
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
@@ -147,18 +142,18 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !instance.DeletionTimestamp.IsZero() {
 		// Delete resources
 		logger.Info("Removing IAM Role")
-		out, err := r.IamRoleService.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 		if err != nil {
 			if pkgaws.IsNotFound(err) {
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{}, err
 		} else {
-			if _, err := r.IamRoleService.DeleteRole(ctx, &iam.DeleteRoleInput{RoleName: out.Role.RoleName}); err != nil {
+			if err := r.roleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
 				return ctrl.Result{}, err
 			}
-			r.notify.Deleted(aws.ToString(out.Role.RoleName))
-			logger.Info("Removed upstream role", "arn", aws.ToString(out.Role.Arn))
+			r.notify.Deleted(instance.GetName())
+			logger.Info("Removed upstream role", "arn", out.Arn)
 		}
 
 		if cu.ContainsFinalizer(instance, Finalizer) {
@@ -196,71 +191,32 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	name := instance.GetNamespace() + "-" + instance.GetName()
 	logger = logger.WithValues("RoleName", name)
 	logger.Info("reconciling iam role")
-	upstream := &iamtypes.Role{}
-	out, err := r.GetRole(ctx, &iam.GetRoleInput{
-		RoleName: aws.String(name),
-	})
+	upstream := &iamrole.IamRole{}
+	out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 	if err != nil {
 		if pkgaws.IsNotFound(err) {
-			doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			raw, err := json.Marshal(doc)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			policy := string(raw)
-			out, err := r.CreateRole(ctx, &iam.CreateRoleInput{
-				RoleName:                 aws.String(name),
-				AssumeRolePolicyDocument: aws.String(policy),
+			out, err := r.roleService.Create(ctx, &iamrole.CreateOptions{
+				Name:           instance.GetName(),
+				PolicyDocument: r.defaultPolicy,
 			})
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			r.notify.Created(aws.ToString(out.Role.RoleName))
-			*upstream = *out.Role
+			r.notify.Created(out.Name)
+			*upstream = *out
 		} else {
 			return ctrl.Result{}, err
 		}
 	} else {
-		*upstream = *out.Role
+		*upstream = *out
 	}
-
-	rawDoc, err := url.QueryUnescape(aws.ToString(upstream.AssumeRolePolicyDocument))
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	current := pkgaws.PolicyDocument{}
-	if err := json.Unmarshal([]byte(rawDoc), &current); err != nil {
-		// This would mean the upstream policy document isn't valid which isn't really feasible
-		// so probably the PolicyDocument class is broken
-		r.notify.InvalidPolicyDocument(aws.ToString(upstream.RoleName))
-		return ctrl.Result{}, err
-	}
-	doc, err := pkgaws.ToPolicyDocument(instance, r.oidcProviderArn)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if !reflect.DeepEqual(doc, current) {
-		raw, err := json.Marshal(doc)
-		if err != nil {
+	old := instance.DeepCopy()
+	instance.Status.RoleArn = upstream.Arn
+	if !reflect.DeepEqual(old.Status, instance.Status) {
+		patch := client.MergeFrom(old)
+		if err := k8.Status().Patch(ctx, instance, patch); err != nil {
 			return ctrl.Result{}, err
 		}
-		policy := string(raw)
-		_, err = r.IamRoleService.UpdateAssumeRolePolicy(ctx, &iam.UpdateAssumeRolePolicyInput{
-			RoleName:       upstream.RoleName,
-			PolicyDocument: aws.String(policy),
-		})
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		r.notify.TrustPolicyUpdated(aws.ToString(upstream.RoleName))
-	}
-
-	instance.Status.RoleArn = aws.ToString(upstream.Arn)
-	if err := k8.Status().Update(ctx, instance); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

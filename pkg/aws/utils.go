@@ -16,13 +16,6 @@ limitations under the License.
 
 package aws
 
-import (
-	"errors"
-	"fmt"
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"strings"
-)
-
 /*
   "Version": "2012-10-17",
   "Statement": [
@@ -44,6 +37,7 @@ import (
 
 // ToPolicyDocument takes an iamrole.aws.jackhoman.com/v1alpha1 and creates a trust policy
 // from the spec. The EKS cluster oidc provider arn is also required for creating the policy
+/*
 func ToPolicyDocument(instance *v1alpha1.IamRole, oidcProviderArn string) (PolicyDocument, error) {
 	doc := PolicyDocument{
 		Version:   "2012-10-17",
@@ -79,3 +73,4 @@ func ToPolicyDocument(instance *v1alpha1.IamRole, oidcProviderArn string) (Polic
 	doc.Statement = append(doc.Statement, st)
 	return doc, nil
 }
+*/

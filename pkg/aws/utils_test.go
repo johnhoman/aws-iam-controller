@@ -1,16 +1,6 @@
 package aws_test
 
-import (
-	"encoding/json"
-	corev1 "k8s.io/api/core/v1"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws"
-)
-
+/*
 var _ = Describe("Utils", func() {
 	It("Should create a trust policy from an iam role", func() {
 		instance := &v1alpha1.IamRole{}
@@ -46,3 +36,4 @@ var _ = Describe("Utils", func() {
 		Expect(m).To(Equal(expected))
 	})
 })
+*/

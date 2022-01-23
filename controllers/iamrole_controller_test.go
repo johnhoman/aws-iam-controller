@@ -19,12 +19,10 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"net/url"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,11 +39,7 @@ import (
 var _ = Describe("IamRoleController", func() {
 	var mgr manager.IntegrationTest
 	var iamService pkgaws.IamService
-	var issuerUrl string
-	var oidcProviderArn string
 	BeforeEach(func() {
-		issuerUrl = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E"
-		oidcProviderArn = fmt.Sprintf("arn:aws:iam::012345678912:oidc-provider/%s", issuerUrl)
 		iamService = newIamService()
 
 		mgr = manager.IntegrationTestBuilder().
@@ -53,12 +47,10 @@ var _ = Describe("IamRoleController", func() {
 			Complete(cfg)
 
 		Expect((&IamRoleReconciler{
-			Client:          mgr.GetClient(),
-			Scheme:          mgr.GetScheme(),
-			notify:          &notifier{},
-			IamRoleService:  iamService,
-			oidcProviderArn: oidcProviderArn,
-			clusterName:     "controller.test",
+			Client:      mgr.GetClient(),
+			Scheme:      mgr.GetScheme(),
+			notify:      &notifier{},
+			roleService: iamrole.New(iamService, "controller-test"),
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
 	})
@@ -158,7 +150,9 @@ var _ = Describe("IamRoleController", func() {
 		}).Should(Succeed())
 		Expect(instance.Finalizers).Should(ContainElement(Finalizer))
 
-		_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+		_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{
+			RoleName: aws.String(instance.GetName()),
+		})
 		Expect(err).ShouldNot(HaveOccurred())
 
 		instance = &v1alpha1.IamRole{}
@@ -173,7 +167,7 @@ var _ = Describe("IamRoleController", func() {
 		Expect(instance.Finalizers).ShouldNot(ContainElement(Finalizer))
 		Expect(instance.ManagedFields[0].Manager).ToNot(Equal("aws-iam-controller"))
 		Consistently(func() bool {
-			_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
+			_, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(instance.GetName())})
 			oe = &iamtypes.NoSuchEntityException{}
 			return errors.As(err, &oe)
 		}).Should(BeTrue())
@@ -189,88 +183,8 @@ var _ = Describe("IamRoleController", func() {
 		}).ShouldNot(HaveOccurred())
 
 		_, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{
-			RoleName: aws.String(roleName(instance)),
+			RoleName: aws.String(instance.GetName()),
 		})
 		Expect(err).ShouldNot(HaveOccurred())
-	})
-	It("Should update the policy document", func() {
-		instance := &v1alpha1.IamRole{}
-		instance.SetName("app-role")
-		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
-			Name: "default",
-		}}
-		mgr.Eventually().Create(instance).Should(Succeed())
-		mgr.Eventually().GetWhen(types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
-			return instance.Status.RoleArn != ""
-		}).ShouldNot(HaveOccurred())
-
-		out, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
-		Expect(err).ShouldNot(HaveOccurred())
-		policy, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
-		doc := &pkgaws.PolicyDocument{}
-		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
-		Expect(doc.Statement).To(HaveLen(1))
-		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
-			fmt.Sprintf("%s:sub", issuerUrl),
-			fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
-		))
-
-		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
-			Name: "webapp-sa",
-		}}
-		mgr.Eventually().Update(instance).Should(Succeed())
-
-		out, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
-		Expect(err).ShouldNot(HaveOccurred())
-		policy, err = url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
-		doc = &pkgaws.PolicyDocument{}
-		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
-		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
-			fmt.Sprintf("%s:sub", issuerUrl),
-			fmt.Sprintf("system:serviceaccount:%s:webapp-sa", instance.GetNamespace()),
-		))
-		Expect(doc.Statement).To(HaveLen(1))
-	})
-	It("Should update add a service account to an existing policy", func() {
-		instance := &v1alpha1.IamRole{}
-		instance.SetName("app-role")
-		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{{
-			Name: "default",
-		}}
-		mgr.Eventually().Create(instance).Should(Succeed())
-		mgr.Eventually().GetWhen(types.NamespacedName{Name: "app-role"}, instance, func(obj client.Object) bool {
-			return instance.Status.RoleArn != ""
-		}).ShouldNot(HaveOccurred())
-
-		out, err := iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
-		Expect(err).ShouldNot(HaveOccurred())
-		policy, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
-		doc := &pkgaws.PolicyDocument{}
-		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
-		Expect(doc.Statement).To(HaveLen(1))
-		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
-			fmt.Sprintf("%s:sub", issuerUrl),
-			fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
-		))
-
-		instance.Spec.ServiceAccounts = []corev1.LocalObjectReference{
-			{Name: "webapp-sa"},
-			{Name: "default"},
-		}
-		mgr.Eventually().Update(instance).Should(Succeed())
-
-		out, err = iamService.GetRole(mgr.GetContext(), &iam.GetRoleInput{RoleName: aws.String(roleName(instance))})
-		Expect(err).ShouldNot(HaveOccurred())
-		policy, err = url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
-		doc = &pkgaws.PolicyDocument{}
-		Expect(json.Unmarshal([]byte(policy), doc)).Should(Succeed())
-		Expect(doc.Statement[0].Condition["StringEquals"]).To(HaveKeyWithValue(
-			fmt.Sprintf("%s:sub", issuerUrl),
-			[]interface{}{
-				fmt.Sprintf("system:serviceaccount:%s:webapp-sa", instance.GetNamespace()),
-				fmt.Sprintf("system:serviceaccount:%s:default", instance.GetNamespace()),
-			},
-		))
-		Expect(doc.Statement).To(HaveLen(1))
 	})
 })

@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,7 +29,8 @@ type IamRoleSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of IamRole. Edit iamrole_types.go to remove/update
-	ServiceAccounts []corev1.LocalObjectReference `json:"serviceAccounts,omitempty"`
+	Description        string `json:"description,omitempty"`
+	MaxDurationSeconds string `json:"maxDurationSeconds,omitempty"`
 }
 
 // IamRoleStatus defines the observed state of IamRole

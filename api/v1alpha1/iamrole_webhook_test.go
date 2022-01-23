@@ -17,26 +17,10 @@ limitations under the License.
 package v1alpha1_test
 
 import (
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("IamRoleWebhook", func() {
-	It("Should deny a request without service accounts", func() {
-		instance := &v1alpha1.IamRole{}
-		instance.SetName("should-deny-no-service-account")
-		Expect(k8sClient.Create(ctx, instance)).ShouldNot(Succeed())
-	})
-	It("Should allow a request with service accounts", func() {
-		instance := &v1alpha1.IamRole{
-			Spec: v1alpha1.IamRoleSpec{
-				ServiceAccounts: []corev1.LocalObjectReference{{Name: "default"}},
-			},
-		}
-		instance.SetName("should-succeed-with-service-account")
-		Expect(namespacedClient.Create(ctx, instance)).Should(Succeed())
+	It("Should do nothing because I didn't write any tests", func() {
 	})
 })
