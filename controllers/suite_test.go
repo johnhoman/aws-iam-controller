@@ -24,10 +24,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-
-	"github.com/johnhoman/aws-iam-controller/pkg/aws"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
-
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -35,12 +31,13 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
+	//+kubebuilder:scaffold:imports
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -82,9 +79,6 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	err = v1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = awsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

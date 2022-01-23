@@ -144,10 +144,9 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		logger.Info("Removing IAM Role")
 		out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 		if err != nil {
-			if pkgaws.IsNotFound(err) {
-				return ctrl.Result{}, nil
+			if !pkgaws.IsNotFound(err) {
+				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, err
 		} else {
 			if err := r.roleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
 				return ctrl.Result{}, err
@@ -165,6 +164,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				logger.Error(err, "unable to patch finalizers")
 				return ctrl.Result{}, err
 			}
+			logger.Info("removed finalizer")
 		}
 		return ctrl.Result{}, nil
 	}
@@ -188,25 +188,23 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	name := instance.GetNamespace() + "-" + instance.GetName()
-	logger = logger.WithValues("RoleName", name)
+	logger = logger.WithValues("RoleName", instance.GetName())
 	logger.Info("reconciling iam role")
 	upstream := &iamrole.IamRole{}
 	out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 	if err != nil {
-		if pkgaws.IsNotFound(err) {
-			out, err := r.roleService.Create(ctx, &iamrole.CreateOptions{
-				Name:           instance.GetName(),
-				PolicyDocument: r.defaultPolicy,
-			})
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			r.notify.Created(out.Name)
-			*upstream = *out
-		} else {
+		if !pkgaws.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
+		out, err := r.roleService.Create(ctx, &iamrole.CreateOptions{
+			Name:           instance.GetName(),
+			PolicyDocument: r.defaultPolicy,
+		})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		r.notify.Created(out.Name)
+		*upstream = *out
 	} else {
 		*upstream = *out
 	}
@@ -227,9 +225,4 @@ func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.IamRole{}).
 		Complete(r)
-}
-
-func roleName(instance *v1alpha1.IamRole) string {
-	name := instance.GetNamespace() + "-" + instance.GetName()
-	return name
 }

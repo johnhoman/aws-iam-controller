@@ -18,19 +18,20 @@ package controllers
 
 import (
 	"context"
-
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 )
 
 // IamRoleBindingReconciler reconciles a IamRoleBinding object
 type IamRoleBindingReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	roleService iamrole.Interface
 }
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamrolebindings,verbs=get;list;watch;create;update;patch;delete
@@ -57,6 +58,6 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&awsv1alpha1.IamRoleBinding{}).
+		For(&v1alpha1.IamRoleBinding{}).
 		Complete(r)
 }
