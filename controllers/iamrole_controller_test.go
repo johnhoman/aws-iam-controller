@@ -164,9 +164,10 @@ var _ = Describe("IamRoleController", func() {
 				})
 				When("The status is out of sync", func() {
 					BeforeEach(func() {
-						cp := instance.DeepCopy()
-						cp.Status = v1alpha1.IamRoleStatus{}
-						mgr.Eventually().Update(cp).Should(Succeed())
+						obj := &v1alpha1.IamRole{}
+						mgr.Eventually().Get(key, obj).Should(Succeed())
+						obj.Status = v1alpha1.IamRoleStatus{}
+						Expect(mgr.GetClient().Status().Update(mgr.GetContext(), obj)).Should(Succeed())
 					})
 					It("Updates the status", func() {
 						obj := &v1alpha1.IamRole{}

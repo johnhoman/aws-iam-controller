@@ -17,26 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// IamRoleBindingSpec defines the desired state of IamRoleBinding
-type IamRoleBindingSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of IamRoleBinding. Edit iamrolebinding_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-}
-
-// IamRoleBindingStatus defines the observed state of IamRoleBinding
-type IamRoleBindingStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
@@ -46,8 +29,8 @@ type IamRoleBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   IamRoleBindingSpec   `json:"spec,omitempty"`
-	Status IamRoleBindingStatus `json:"status,omitempty"`
+	RoleRef  rbacv1.RoleRef   `json:"roleRef,omitempty"`
+	Subjects []rbacv1.Subject `json:"subjects,omitempty"`
 }
 
 //+kubebuilder:object:root=true

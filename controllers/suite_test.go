@@ -43,9 +43,38 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+/*
+{
+  "Effect": "Allow",
+  "Principal": {
+    "Federated": "arn:aws:iam::your-account-id:oidc-provider/oidc.eks.your-region-code.amazonaws.com/id/EXAMPLE_OIDC_IDENTIFIER"
+  },
+  "Action": "sts:AssumeRoleWithWebIdentity",
+  "Condition": {
+    "StringEquals": {
+      "oidc.eks.your-region-code.amazonaws.com/id/EXAMPLE_OIDC_IDENTIFIER:sub": "system:serviceaccount:your-namespace:your-service-account"
+    }
+  }
+}
+*/
+
 var cfg *rest.Config
 var testEnv *envtest.Environment
 
+func defaultPolicy() map[string]interface{} {
+	doc := map[string]interface{}{
+		"Version": "2012-10-17",
+		"Statement": []interface{}{
+			map[string]interface{}{
+				"Sid":       "DenyAllAWS",
+				"Effect":    "Deny",
+				"Principal": map[string]interface{}{"AWS": "*"},
+				"Action":    "sts:AssumeRole",
+			},
+		},
+	}
+	return doc
+}
 func newIamService() aws.IamService {
 	if _, ok := os.LookupEnv("AWS_IAM_CONTROLLER_AWS_LIVE"); ok {
 		cfg, err := config.LoadDefaultConfig(context.TODO())
