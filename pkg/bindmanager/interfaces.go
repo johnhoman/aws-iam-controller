@@ -11,6 +11,7 @@ type Patch interface {
 }
 
 type Manager interface {
+	Unbind(ctx context.Context, binding *Binding) error
 	Bind(ctx context.Context, binding *Binding) error
 	IsBound(ctx context.Context, binding *Binding) (bool, error)
 	Patch(binding *Binding, options ...client.PatchOption) Patch
