@@ -17,20 +17,29 @@ limitations under the License.
 package v1alpha1
 
 import (
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type IamRoleBindingSpec struct {
+	IamRoleRef        string `json:"iamRoleRef"`
+	ServiceAccountRef string `json:"serviceAccountRef"`
+}
+
+type IamRoleBindingStatus struct {
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Role",type=string,JSONPath=`.spec.iamRoleRef`
+//+kubebuilder:printcolumn:name="ServiceAccount",type=string,JSONPath=`.spec.serviceAccountRef`
 
 // IamRoleBinding is the Schema for the iamrolebindings API
 type IamRoleBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	RoleRef  rbacv1.RoleRef   `json:"roleRef,omitempty"`
-	Subjects []rbacv1.Subject `json:"subjects,omitempty"`
+	Spec   IamRoleBindingSpec   `json:"spec,omitempty"`
+	Status IamRoleBindingStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -22,3 +22,7 @@ testbin/*
 *.swp
 *.swo
 *~
+
+# terraform
+*.terraform*
+*.tfstate

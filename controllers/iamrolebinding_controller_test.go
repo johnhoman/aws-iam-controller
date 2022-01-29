@@ -9,7 +9,6 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/johnhoman/controller-tools/manager"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,17 +72,8 @@ var _ = Describe("IamrolebindingController", func() {
 
 			instance = &v1alpha1.IamRoleBinding{}
 			instance.SetName(name)
-			instance.RoleRef = rbacv1.RoleRef{
-				APIGroup: "aws.jackhoman.com",
-				Kind:     role.Kind,
-				Name:     name,
-			}
-			instance.Subjects = []rbacv1.Subject{{
-				APIGroup:  sa.GroupVersionKind().Group,
-				Kind:      sa.Kind,
-				Name:      sa.GetName(),
-				Namespace: sa.GetNamespace(),
-			}}
+			instance.Spec.IamRoleRef = role.GetName()
+			instance.Spec.ServiceAccountRef = sa.GetName()
 			mgr.Eventually().Create(instance).Should(Succeed())
 		})
 		When("the role exists", func() {

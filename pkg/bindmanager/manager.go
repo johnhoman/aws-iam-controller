@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
@@ -129,6 +130,10 @@ func (b *bindManager) IsBound(ctx context.Context, binding *Binding) (bool, erro
 		}
 	}
 	return false, nil
+}
+
+func (b *bindManager) Patch(binding *Binding, options ...client.PatchOption) Patch {
+	return &patch{binding: binding, options: options}
 }
 
 var _ Manager = &bindManager{}
