@@ -9,9 +9,12 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/johnhoman/controller-tools/manager"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,9 +52,7 @@ var _ = Describe("IamrolebindingController", func() {
 		Expect((&IamRoleBindingReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
-			roleService:   roleService,
-			oidcArn:       oidcArn,
-			issuerUrl:     issuerUrl,
+			bindManager: bindmanager.New(roleService, oidcArn),
 			EventRecorder: mgr.GetEventRecorderFor("controller.iamrolebinding.test"),
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
@@ -149,19 +150,67 @@ var _ = Describe("IamrolebindingController", func() {
 							))
 						})
 					})
-					When("the service account is annotated", func() {
-						When("the service account is annotated by another role binding", func() {
-							It("Should not annotate the service account", func() {
-								Skip("not implemented")
+					When("the service account is annotated by another role binding", func() {
+						BeforeEach(func() {
+							obj := &corev1.ServiceAccount{}
+							// this isn't setting kind for some reason -- wtf?
+							mgr.Eventually().Get(types.NamespacedName{Name: sa.GetName()}, obj).Should(Succeed())
+							// Think I need to switch to an uncached client
+							patch := &unstructured.Unstructured{Object: map[string]interface{}{
+								"metadata": map[string]interface{}{
+									"annotations": map[string]string{
+										bindmanager.IamRoleArnAnnotation: "arn:aws:iam::0123456789012:role/another-owner",
+									},
+								},
+							}}
+							patch.SetGroupVersionKind(schema.GroupVersionKind{
+								Version: "v1",
+								Kind: "ServiceAccount",
 							})
-							It("Should not trust the service account", func() {
-								Skip("not implemented")
-							})
+							patch.SetName(obj.GetName())
+							patch.SetNamespace(obj.GetNamespace())
+							Expect(mgr.GetClient().Patch(
+								mgr.GetContext(),
+								patch,
+								client.Apply,
+								client.FieldOwner("another-owner"),
+								client.ForceOwnership,
+							)).Should(Succeed())
 						})
-						When("the service account is annotated by the current role binding", func() {
-							It("Should have a managed field entry for the service account", func() {
-								Skip("not implemented")
-							})
+						It("Should not annotate the service account", func() {
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								arn, ok := obj.GetAnnotations()[bindmanager.IamRoleArnAnnotation]
+								if !ok {
+									return false
+								}
+								return strings.HasSuffix(arn, instance.GetName())
+							}).ShouldNot(Succeed())
+						})
+						It("Should not trust the service account", func() {
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().Get(types.NamespacedName{Name: sa.GetName()}, obj).Should(Succeed())
+							iamRole := &v1alpha1.IamRole{}
+							mgr.Eventually().Get(types.NamespacedName{Name: role.GetName()}, iamRole).Should(Succeed())
+							bm := bindmanager.New(roleService, oidcArn)
+							matcher := func() bool {
+								ok, err := bm.IsBound(mgr.GetContext(), &bindmanager.Binding{
+									ServiceAccount: obj,
+									Role: iamRole,
+								})
+								if err != nil {
+									return false
+								}
+								return ok
+							}
+							Eventually(matcher).Should(BeFalse())
+							// Should not recreate the resource
+							Consistently(matcher).Should(BeFalse())
+						})
+					})
+					When("the service account is annotated by the current role binding", func() {
+						It("Should have a managed field entry for the service account", func() {
+							Skip("not implemented")
 						})
 					})
 					When("the service account is not annotated", func() {

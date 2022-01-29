@@ -164,10 +164,12 @@ var _ = Describe("IamRoleController", func() {
 				})
 				When("The status is out of sync", func() {
 					BeforeEach(func() {
-						obj := &v1alpha1.IamRole{}
-						mgr.Eventually().Get(key, obj).Should(Succeed())
-						obj.Status = v1alpha1.IamRoleStatus{}
-						Expect(mgr.GetClient().Status().Update(mgr.GetContext(), obj)).Should(Succeed())
+						Eventually(func() error {
+							obj := &v1alpha1.IamRole{}
+							mgr.Eventually().Get(key, obj).Should(Succeed())
+							obj.Status = v1alpha1.IamRoleStatus{}
+							return mgr.GetClient().Status().Update(mgr.GetContext(), obj)
+						}).Should(Succeed())
 					})
 					It("Updates the status", func() {
 						obj := &v1alpha1.IamRole{}
