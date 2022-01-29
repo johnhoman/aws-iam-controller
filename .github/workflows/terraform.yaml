@@ -17,5 +17,3 @@ jobs:
       run: terraform init
     - name: validate
       run: terraform validate -no-color
-    - name: plan
-      run: terraform plan -no-color

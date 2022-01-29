@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,6 +149,8 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// TODO: Figure out the how to re-trigger on service account
+	// TODO: Figure out the how to re-trigger on iamRole
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.IamRoleBinding{}).
 		Complete(r)

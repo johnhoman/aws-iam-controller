@@ -24,11 +24,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -222,7 +225,32 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1alpha1.IamRoleBinding{}, "spec.iamRoleRef", func(obj client.Object) []string {
+		binding, ok := obj.(*v1alpha1.IamRoleBinding)
+		if !ok {
+			return []string{}
+		}
+		return []string{binding.Spec.IamRoleRef}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.IamRole{}).
+		Watches(
+			&source.Kind{Type: &v1alpha1.IamRoleBinding{}},
+			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []ctrl.Request {
+				binding, ok := obj.(*v1alpha1.IamRoleBinding)
+				if ok {
+					return []ctrl.Request{{
+						NamespacedName: types.NamespacedName{
+							Name: binding.Spec.IamRoleRef,
+							Namespace: binding.GetNamespace(),
+						},
+					}}
+				}
+				return []ctrl.Request{}
+			}),
+	    ).
 		Complete(r)
 }
