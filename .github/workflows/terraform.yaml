@@ -1,0 +1,21 @@
+name: terraform lint
+on:
+  push:
+jobs:
+  terraform:
+    defaults:
+      run:
+        working-directory: terraform/aws-iam-controller
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: hashicorp/setup-terraform@v1
+    - name: fmt
+      run: terraform fmt -check
+      continue-on-error: true
+    - name: init
+      run: terraform init
+    - name: validate
+      run: terraform validate --no-color
+    - name: plan
+      run: terraform plan --no-color
