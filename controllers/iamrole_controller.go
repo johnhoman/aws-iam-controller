@@ -244,13 +244,13 @@ func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if ok {
 					return []ctrl.Request{{
 						NamespacedName: types.NamespacedName{
-							Name: binding.Spec.IamRoleRef,
+							Name:      binding.Spec.IamRoleRef,
 							Namespace: binding.GetNamespace(),
 						},
 					}}
 				}
 				return []ctrl.Request{}
 			}),
-	    ).
+		).
 		Complete(r)
 }
