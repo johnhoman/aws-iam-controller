@@ -19,7 +19,7 @@ type patch struct {
 func (p *patch) Do(ctx context.Context, c client.Client) error {
 	saPatch := &unstructured.Unstructured{Object: map[string]interface{}{
 		"metadata": map[string]interface{}{
-			"annotations": map[string]interface{}{
+			"annotations": map[string]string{
 				IamRoleArnAnnotation: p.binding.Role.Status.RoleArn,
 			},
 		},

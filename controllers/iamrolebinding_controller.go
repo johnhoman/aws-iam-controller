@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,9 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 )
 
 const IamRoleBindingOwnerAnnotation = "aws.jackhoman.com/iam-role-binding"
@@ -101,7 +100,7 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// that is already bound to something that isn't owned by this binding
 
 	if arn, found := serviceAccount.GetAnnotations()[bindmanager.IamRoleArnAnnotation]; !found {
-		if owner, ok := serviceAccount.GetAnnotations()[IamRoleArnAnnotation]; ok {
+		if owner, ok := serviceAccount.GetAnnotations()[IamRoleBindingOwnerAnnotation]; ok {
 			if owner != instance.GetName() {
 				// The service account is already owned
 				r.Event(instance, corev1.EventTypeWarning, "Conflict", fmt.Sprintf(
@@ -110,18 +109,22 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{}, fmt.Errorf("service account already managed by %s", owner)
 			}
 		} else {
+			logger.Info("setting owner annotation")
 			// Own it
 			patch := &unstructured.Unstructured{Object: map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"annotations": map[string]string{IamRoleBindingOwnerAnnotation: instance.GetName()},
 				},
 			}}
-			patch.SetGroupVersionKind(iamRole.GroupVersionKind())
-			patch.SetName(iamRole.GetName())
+			patch.SetName(serviceAccount.GetName())
+			patch.SetGroupVersionKind(serviceAccount.GroupVersionKind())
+			// This patch isn't working for some reason
 			if err := k8s.Patch(ctx, patch, client.Apply, client.FieldOwner(instance.GetName())); err != nil {
 				logger.Error(err, "failed to tag service account with owner")
 				return ctrl.Result{}, err
 			}
+			logger.Info("patched service account with owner reference")
+			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
 		// if the status gets cleared
@@ -184,14 +187,15 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ctrl.Result{}, err
 		}
 	}
-	logger.Info("adding annotation for iam role to service account", "roleName", iamRole.GetName())
 	if _, ok := serviceAccount.GetAnnotations()[bindmanager.IamRoleArnAnnotation]; !ok {
+		logger.Info("adding annotation for iam role to service account", "roleName", iamRole.GetName())
+		// This is removing the owner annotation ?
 		if err := r.bindManager.Patch(binding, client.FieldOwner(instance.GetName())).Do(ctx, k8s); err != nil {
 			return ctrl.Result{}, err
 		}
+		logger.Info("patched service account", "serviceAccountName", serviceAccount.GetName())
+		return ctrl.Result{Requeue: true}, nil
 	}
-	logger.Info("patched service account", "serviceAccountName", serviceAccount.GetName())
-
 
 	return ctrl.Result{}, nil
 }

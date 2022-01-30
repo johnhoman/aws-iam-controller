@@ -52,7 +52,7 @@ var _ = Describe("IamrolebindingController", func() {
 		Expect((&IamRoleBindingReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
-			bindManager: bindmanager.New(roleService, oidcArn),
+			bindManager:   bindmanager.New(roleService, oidcArn),
 			EventRecorder: mgr.GetEventRecorderFor("controller.iamrolebinding.test"),
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
@@ -165,7 +165,7 @@ var _ = Describe("IamrolebindingController", func() {
 							}}
 							patch.SetGroupVersionKind(schema.GroupVersionKind{
 								Version: "v1",
-								Kind: "ServiceAccount",
+								Kind:    "ServiceAccount",
 							})
 							patch.SetName(obj.GetName())
 							patch.SetNamespace(obj.GetNamespace())
@@ -196,7 +196,7 @@ var _ = Describe("IamrolebindingController", func() {
 							matcher := func() bool {
 								ok, err := bm.IsBound(mgr.GetContext(), &bindmanager.Binding{
 									ServiceAccount: obj,
-									Role: iamRole,
+									Role:           iamRole,
 								})
 								if err != nil {
 									return false
@@ -210,12 +210,39 @@ var _ = Describe("IamrolebindingController", func() {
 					})
 					When("the service account is annotated by the current role binding", func() {
 						It("Should have a managed field entry for the service account", func() {
-							Skip("not implemented")
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								return len(obj.GetManagedFields()) > 0
+							}).Should(Succeed())
+							Expect(obj.GetManagedFields()[0].Manager).To(Equal(instance.GetName()))
+						})
+						FIt("Should have an annotation describing the role binding that owns it", func() {
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								_, ok := obj.GetAnnotations()[IamRoleBindingOwnerAnnotation]
+								return ok
+							}).Should(Succeed())
+							Expect(obj.GetAnnotations()[IamRoleBindingOwnerAnnotation]).Should(Equal(instance.GetName()))
 						})
 					})
 					When("the service account is not annotated", func() {
+						BeforeEach(func() {
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								_, ok := obj.GetAnnotations()[IamRoleArnAnnotation]
+								return ok
+							}).Should(Succeed())
+							annotations := obj.GetAnnotations()
+							delete(annotations, IamRoleArnAnnotation)
+							obj.SetAnnotations(annotations)
+							mgr.Eventually().Update(obj).Should(Succeed())
+						})
 						It("Should annotate the service account", func() {
-							Skip("not implemented")
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								_, ok := obj.GetAnnotations()[IamRoleArnAnnotation]
+								return ok
+							}).Should(Succeed())
 						})
 					})
 				})
