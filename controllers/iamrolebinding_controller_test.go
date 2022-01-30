@@ -8,6 +8,8 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/johnhoman/controller-tools/manager"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,9 +17,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("IamrolebindingController", func() {
@@ -57,7 +56,9 @@ var _ = Describe("IamrolebindingController", func() {
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
 	})
-	AfterEach(func() { mgr.StopManager() })
+	AfterEach(func() {
+		mgr.StopManager()
+	})
 	When("The resource exists", func() {
 		var instance *v1alpha1.IamRoleBinding
 		var role *v1alpha1.IamRole
@@ -94,11 +95,7 @@ var _ = Describe("IamrolebindingController", func() {
 							doc = defaultPolicy()
 							statements := doc["Statement"].([]interface{})
 							statements = append(statements, map[string]interface{}{
-								"Sid": fmt.Sprintf(
-									"AllowServiceAccount-%s-%s",
-									sa.GetNamespace(),
-									sa.GetName(),
-								),
+								"Sid":       bindmanager.SidLabel(instance.GetName(), instance.GetNamespace()),
 								"Effect":    "Allow",
 								"Principal": map[string]interface{}{"Federated": oidcArn},
 								"Action":    "sts:AssumeRoleWithWebIdentity",
@@ -124,7 +121,7 @@ var _ = Describe("IamrolebindingController", func() {
 						It("Should annotate the service account", func() {
 							obj := &corev1.ServiceAccount{}
 							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
-								return len(obj.GetAnnotations()) > 0
+								return len(obj.GetAnnotations()) > 1
 							}).ShouldNot(HaveOccurred())
 							Expect(obj.GetAnnotations()).Should(HaveKeyWithValue("eks.amazonaws.com/role-arn", role.Status.RoleArn))
 						})
@@ -209,14 +206,7 @@ var _ = Describe("IamrolebindingController", func() {
 						})
 					})
 					When("the service account is annotated by the current role binding", func() {
-						It("Should have a managed field entry for the service account", func() {
-							obj := &corev1.ServiceAccount{}
-							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
-								return len(obj.GetManagedFields()) > 0
-							}).Should(Succeed())
-							Expect(obj.GetManagedFields()[0].Manager).To(Equal(instance.GetName()))
-						})
-						FIt("Should have an annotation describing the role binding that owns it", func() {
+						It("Should have an annotation describing the role binding that owns it", func() {
 							obj := &corev1.ServiceAccount{}
 							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
 								_, ok := obj.GetAnnotations()[IamRoleBindingOwnerAnnotation]
@@ -226,8 +216,9 @@ var _ = Describe("IamrolebindingController", func() {
 						})
 					})
 					When("the service account is not annotated", func() {
-						BeforeEach(func() {
+						It("Should annotate the service account", func() {
 							obj := &corev1.ServiceAccount{}
+							// This definitely didn't wait long enough
 							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
 								_, ok := obj.GetAnnotations()[IamRoleArnAnnotation]
 								return ok
@@ -235,10 +226,10 @@ var _ = Describe("IamrolebindingController", func() {
 							annotations := obj.GetAnnotations()
 							delete(annotations, IamRoleArnAnnotation)
 							obj.SetAnnotations(annotations)
-							mgr.Eventually().Update(obj).Should(Succeed())
-						})
-						It("Should annotate the service account", func() {
-							obj := &corev1.ServiceAccount{}
+							// This is not working
+							mgr.Expect().Update(obj).Should(Succeed())
+
+							obj = &corev1.ServiceAccount{}
 							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
 								_, ok := obj.GetAnnotations()[IamRoleArnAnnotation]
 								return ok

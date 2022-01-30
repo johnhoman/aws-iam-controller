@@ -111,9 +111,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
-
-	// This should be swapped out in CI with real tests against real AWS
-	// but this is fine for now
 }, 60)
 
 var _ = AfterSuite(func() {

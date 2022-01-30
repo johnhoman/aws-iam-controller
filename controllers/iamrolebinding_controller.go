@@ -22,7 +22,6 @@ import (
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -32,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sync"
 )
 
 const IamRoleBindingOwnerAnnotation = "aws.jackhoman.com/iam-role-binding"
@@ -42,6 +42,7 @@ type IamRoleBindingReconciler struct {
 	Scheme *runtime.Scheme
 	record.EventRecorder
 
+	mutex       sync.Mutex
 	bindManager bindmanager.Manager
 }
 
@@ -92,14 +93,19 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	serviceAccount := &corev1.ServiceAccount{}
 	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Spec.ServiceAccountRef}, serviceAccount); err != nil {
-		r.Eventf(instance, corev1.EventTypeWarning, "ServiceAccountNotFound", "ServiceAccount %s not found", instance.Spec.ServiceAccountRef)
+		r.Event(instance, corev1.EventTypeWarning, "ServiceAccountNotFound", fmt.Sprintf(
+			"ServiceAccount %s not found",
+			instance.Spec.ServiceAccountRef,
+		))
 		return ctrl.Result{}, err
 	}
 	binding := &bindmanager.Binding{Role: iamRole, ServiceAccount: serviceAccount}
 	// This logic is a little messy -- essentially, we don't want to steal ownership from a service account
 	// that is already bound to something that isn't owned by this binding
 
-	if arn, found := serviceAccount.GetAnnotations()[bindmanager.IamRoleArnAnnotation]; !found {
+	arn, found := serviceAccount.GetAnnotations()[bindmanager.IamRoleArnAnnotation]
+	if !found {
+		// Not found then add it
 		if owner, ok := serviceAccount.GetAnnotations()[IamRoleBindingOwnerAnnotation]; ok {
 			if owner != instance.GetName() {
 				// The service account is already owned
@@ -109,94 +115,61 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{}, fmt.Errorf("service account already managed by %s", owner)
 			}
 		} else {
+			// not found
 			logger.Info("setting owner annotation")
 			// Own it
-			patch := &unstructured.Unstructured{Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"annotations": map[string]string{IamRoleBindingOwnerAnnotation: instance.GetName()},
-				},
-			}}
-			patch.SetName(serviceAccount.GetName())
-			patch.SetGroupVersionKind(serviceAccount.GroupVersionKind())
+			patch := client.MergeFrom(serviceAccount.DeepCopy())
+			annotations := serviceAccount.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[IamRoleBindingOwnerAnnotation] = instance.GetName()
+			serviceAccount.SetAnnotations(annotations)
 			// This patch isn't working for some reason
-			if err := k8s.Patch(ctx, patch, client.Apply, client.FieldOwner(instance.GetName())); err != nil {
+			if err := k8s.Patch(ctx, serviceAccount, patch, client.FieldOwner(instance.GetName())); err != nil {
 				logger.Error(err, "failed to tag service account with owner")
 				return ctrl.Result{}, err
 			}
 			logger.Info("patched service account with owner reference")
-			return ctrl.Result{Requeue: true}, nil
 		}
-	} else {
-		// if the status gets cleared
-		if arn != iamRole.Status.RoleArn {
-			bound, err := r.bindManager.IsBound(ctx, binding)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if bound {
-				if err := r.bindManager.Unbind(ctx, binding); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-			r.Event(instance, corev1.EventTypeWarning, "Conflict", "Refusing to overwrite existing iam role annotation")
-			return ctrl.Result{}, fmt.Errorf("iam role annotation already exists")
-		}
-		// found and arn is as expected
-	}
-
-	// TODO: lock resource -- if I use the below and something fails, the resource could get indefinitely
-	//       locked and the role will be stuck that way
-	// patch := &unstructured.Unstructured{Object: map[string]interface{}{
-	// 	"metadata": map[string]interface{}{
-	// 		"annotations": map[string]string{IamRoleLock: instance.GetName()},
-	// 	},
-	// }}
-	// patch.SetGroupVersionKind(iamRole.GroupVersionKind())
-	// patch.SetName(iamRole.GetName())
-	// if err := k8s.Patch(ctx, patch, client.Apply, client.FieldOwner(instance.GetName())); err != nil {
-	// 	r.Event(instance, corev1.EventTypeWarning, "LockAcquisitionFailure", fmt.Sprintf(
-	// 		"Failed to acquire lock on IamRole %s", iamRole.GetName(),
-	// 	))
-	// 	return ctrl.Result{}, err
-	// }
-	// logger.Info("Acquired lock", "role", iamRole.GetName())
-
-	// defer func() {
-	// 	// UNLOCK
-	// 	_, found := iamRole.GetAnnotations()[IamRoleLock]
-	// 	if found {
-	// 		unpatch := client.MergeFrom(iamRole.DeepCopy())
-	// 		annotations := iamRole.GetAnnotations()
-	// 		delete(annotations, IamRoleLock)
-	// 		iamRole.SetAnnotations(annotations)
-	// 		if err := k8s.Patch(ctx, iamRole, unpatch); err != nil {
-	// 			r.Event(instance, corev1.EventTypeWarning, "LockReleaseFailure", fmt.Sprintf(
-	// 				"Failed to release lock on IamRole %s", iamRole.GetName(),
-	// 			))
-	// 		}
-	// 	}
-	// }()
-
-	// the service account needs another annotation after this
-	ok, err := r.bindManager.IsBound(ctx, binding)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if !ok {
-		if err := r.bindManager.Bind(ctx, binding); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	if _, ok := serviceAccount.GetAnnotations()[bindmanager.IamRoleArnAnnotation]; !ok {
 		logger.Info("adding annotation for iam role to service account", "roleName", iamRole.GetName())
 		// This is removing the owner annotation ?
 		if err := r.bindManager.Patch(binding, client.FieldOwner(instance.GetName())).Do(ctx, k8s); err != nil {
 			return ctrl.Result{}, err
 		}
-		logger.Info("patched service account", "serviceAccountName", serviceAccount.GetName())
-		return ctrl.Result{Requeue: true}, nil
+		logger.Info("patched service account", "serviceAccountName", serviceAccount.GetName(), "roleArn", iamRole.Status.RoleArn)
+	}
+	// TODO: This lock won't work if running the reconciler in multiple pods
+	//       -- the thing that needs to be locked is updating the trust policy
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	// if the status gets cleared something weird might happen here
+	if len(arn) > 0 && arn != iamRole.Status.RoleArn {
+		bound, err := r.bindManager.IsBound(ctx, binding)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if bound {
+			if err := r.bindManager.Unbind(ctx, binding); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		r.Event(instance, corev1.EventTypeWarning, "Conflict", "Refusing to overwrite existing iam role annotation")
+		return ctrl.Result{}, fmt.Errorf("iam role annotation already exists %s != %s", arn, iamRole.Status.RoleArn)
+	} else {
+		ok, err := r.bindManager.IsBound(ctx, binding)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !ok {
+			if err := r.bindManager.Bind(ctx, binding); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
+	// the service account needs another annotation after this
 	return ctrl.Result{}, nil
 }
 
