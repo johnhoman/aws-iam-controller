@@ -151,3 +151,7 @@ func sidLabel(name, namespace string) string {
 	sid = strings.ReplaceAll(sid, " ", "")
 	return sid
 }
+
+func SidLabel(name, namespace string) string {
+	return sidLabel(name, namespace)
+}
