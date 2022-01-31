@@ -120,7 +120,7 @@ var _ = BeforeSuite(func() {
 	err = (&v1alpha1.IamRole{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&IamRoleBinding{}).SetupWebhookWithManager(mgr)
+	err = (&v1alpha1.IamRoleBinding{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:webhook

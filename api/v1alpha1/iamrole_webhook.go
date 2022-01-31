@@ -39,6 +39,10 @@ var _ webhook.Defaulter = &IamRole{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *IamRole) Default() {
 	iamrolelog.Info("default", "name", r.Name)
+
+	if r.Spec.MaxDurationSeconds == 0 {
+		r.Spec.MaxDurationSeconds = 3600
+	}
 }
 
 //+kubebuilder:webhook:path=/validate-aws-jackhoman-com-v1alpha1-iamrole,mutating=false,failurePolicy=fail,sideEffects=None,groups=aws.jackhoman.com,resources=iamroles,verbs=create;update,versions=v1alpha1,name=viamrole.kb.io,admissionReviewVersions=v1

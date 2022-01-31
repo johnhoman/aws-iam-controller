@@ -26,6 +26,26 @@ webhooks:
     resources:
     - iamroles
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-aws-jackhoman-com-v1alpha1-iamrolebinding
+  failurePolicy: Fail
+  name: miamrolebinding.kb.io
+  rules:
+  - apiGroups:
+    - aws.jackhoman.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - iamrolebindings
+  sideEffects: None
 
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -53,4 +73,24 @@ webhooks:
     - UPDATE
     resources:
     - iamroles
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-aws-jackhoman-com-v1alpha1-iamrolebinding
+  failurePolicy: Fail
+  name: viamrolebinding.kb.io
+  rules:
+  - apiGroups:
+    - aws.jackhoman.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - iamrolebindings
   sideEffects: None

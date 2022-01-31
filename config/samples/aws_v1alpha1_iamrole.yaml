@@ -1,0 +1,8 @@
+apiVersion: aws.jackhoman.com/v1alpha1
+kind: IamRole
+metadata:
+  name: iamrole-sample
+  namespace: default
+spec:
+  description: "Sample iam role"
+  maxDurationSeconds: 3600
