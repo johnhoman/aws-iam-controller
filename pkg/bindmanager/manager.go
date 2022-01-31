@@ -79,6 +79,7 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 }
 
 func (b *bindManager) Unbind(ctx context.Context, binding *Binding) error {
+	// This is not great -- it exposes an implementation detail of the naming of roles
 	upstream, err := b.Get(ctx, &iamrole.GetOptions{Name: binding.Role.GetName()})
 	if err != nil {
 		return err

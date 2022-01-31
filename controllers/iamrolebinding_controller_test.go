@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,7 +61,7 @@ var _ = Describe("IamrolebindingController", func() {
 	AfterEach(func() {
 		mgr.StopManager()
 	})
-	When("The resource exists", func() {
+	When("the resource exists", func() {
 		var instance *v1alpha1.IamRoleBinding
 		var role *v1alpha1.IamRole
 		var sa *corev1.ServiceAccount
@@ -74,6 +75,7 @@ var _ = Describe("IamrolebindingController", func() {
 			sa.SetName(name)
 
 			instance = &v1alpha1.IamRoleBinding{}
+			instance.SetFinalizers([]string{"keep"})
 			instance.SetName(name)
 			instance.Spec.IamRoleRef = role.GetName()
 			instance.Spec.ServiceAccountRef = sa.GetName()
@@ -92,31 +94,13 @@ var _ = Describe("IamrolebindingController", func() {
 				})
 				When("the role trusts the service account", func() {
 					BeforeEach(func() {
-						doc = defaultPolicy()
-						statements := doc["Statement"].([]interface{})
-						statements = append(statements, map[string]interface{}{
-							"Sid":       bindmanager.SidLabel(instance.GetName(), instance.GetNamespace()),
-							"Effect":    "Allow",
-							"Principal": map[string]interface{}{"Federated": oidcArn},
-							"Action":    "sts:AssumeRoleWithWebIdentity",
-							"Condition": map[string]interface{}{
-								"StringEquals": map[string]interface{}{
-									issuerUrl: fmt.Sprintf(
-										"system:serviceaccount:%s:%s",
-										sa.GetNamespace(),
-										sa.GetName(),
-									),
-								},
-							},
-						})
-						doc["Statement"] = statements
-						raw, err := json.Marshal(doc)
-						Expect(err).ShouldNot(HaveOccurred())
-						_, err = roleService.Update(mgr.GetContext(), &iamrole.UpdateOptions{
-							Name:           role.GetName(),
-							PolicyDocument: string(raw),
-						})
-						Expect(err).Should(Succeed())
+						Eventually(func() bool {
+							ok, err := bindManager.IsBound(mgr.GetContext(), &bindmanager.Binding{ServiceAccount: sa, Role: role})
+							if err != nil {
+								return false
+							}
+							return ok
+						}).Should(BeTrue())
 					})
 					It("Should annotate the service account", func() {
 						obj := &corev1.ServiceAccount{}
@@ -124,6 +108,36 @@ var _ = Describe("IamrolebindingController", func() {
 							return len(obj.GetAnnotations()) > 1
 						}).ShouldNot(HaveOccurred())
 						Expect(obj.GetAnnotations()).Should(HaveKeyWithValue("eks.amazonaws.com/role-arn", role.Status.RoleArn))
+					})
+					When("the role binding is deleted", func() {
+						var isBound = func() bool {
+							binding := bindmanager.Binding{ServiceAccount: sa, Role: role}
+							ok, err := bindManager.IsBound(mgr.GetContext(), &binding)
+							if err != nil {
+								return false
+							}
+							return ok
+
+						}
+						BeforeEach(func() {
+							Eventually(isBound).Should(BeTrue())
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								meta := obj.(*corev1.ServiceAccount).ObjectMeta
+								return metav1.HasAnnotation(meta, IamRoleArnAnnotation) && metav1.HasAnnotation(meta, IamRoleBindingOwnerAnnotation)
+							}).Should(Succeed())
+							mgr.Expect().Delete(instance).Should(Succeed())
+						})
+						It("should update the trust policy", func() {
+							Eventually(isBound).Should(BeFalse())
+						})
+						It("should remove the service account annotation", func() {
+							obj := &corev1.ServiceAccount{}
+							mgr.Eventually().GetWhen(types.NamespacedName{Name: sa.GetName()}, obj, func(obj client.Object) bool {
+								meta := obj.(*corev1.ServiceAccount).ObjectMeta
+								return !metav1.HasAnnotation(meta, IamRoleArnAnnotation) && !metav1.HasAnnotation(meta, IamRoleBindingOwnerAnnotation)
+							}).Should(Succeed())
+						})
 					})
 				})
 				When("the role doesn't trust the service account", func() {
