@@ -2,15 +2,13 @@ module github.com/johnhoman/aws-iam-controller
 
 go 1.17
 
-replace github.com/johnhoman/controller-tools => ../controller-tools
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.13.0
 	github.com/aws/aws-sdk-go-v2/config v1.13.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.16.0
 	github.com/aws/smithy-go v1.10.0
 	github.com/google/uuid v1.1.2
-	github.com/johnhoman/controller-tools v0.0.0-20220117020614-a0c5c2aafd0e
+	github.com/johnhoman/controller-tools v0.0.0-20220130205403-48b6692ecfd3
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/prometheus/client_golang v1.11.0
