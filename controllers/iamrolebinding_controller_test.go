@@ -247,11 +247,19 @@ var _ = Describe("IamrolebindingController", func() {
 			})
 		})
 		When("The role does not exist", func() {
-			When("the subject is a service account", func() {
-				When("the service account is not annotated", func() {
-					It("does not annotate the service account", func() {
-						// Skip("not implemented")
-					})
+			When("the service account is not annotated", func() {
+				BeforeEach(func() {
+					mgr.Eventually().Create(sa).Should(Succeed())
+				})
+				It("does not annotate the service account", func() {
+					Consistently(func() bool {
+						obj := &corev1.ServiceAccount{}
+						err := mgr.Uncached().Get(mgr.GetContext(), types.NamespacedName{Name: sa.GetName()}, sa)
+						if err != nil {
+							return false
+						}
+						return obj.GetAnnotations() == nil
+					}).Should(BeTrue())
 				})
 			})
 		})
