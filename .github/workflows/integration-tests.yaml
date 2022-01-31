@@ -27,8 +27,8 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
         issuer=$(aws eks describe-cluster --name ${{ steps.create-cluster.outputs.cluster-name }} --query "cluster.identity.oidc.issuer" | sed 's/https:\/\///g')
-        arn=$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList" | grep $issuer)
-        echo "::set-output name=arn::$arn"
+        arn="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:oidc-provider/${issuer}"
+        echo "::set-output name=arn::${arn}"
         echo "::set-output name=issuer::$issuer"
   terraform:
     outputs:
