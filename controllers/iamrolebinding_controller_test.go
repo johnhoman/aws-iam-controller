@@ -47,13 +47,13 @@ var _ = Describe("IamrolebindingController", func() {
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
 			notify:        &notifier{},
-			roleService:   roleService,
-			defaultPolicy: string(raw),
+			RoleService:   roleService,
+			DefaultPolicy: string(raw),
 		}).SetupWithManager(mgr)).Should(Succeed())
 		Expect((&IamRoleBindingReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
-			bindManager:   bindManager,
+			BindManager:   bindManager,
 			EventRecorder: mgr.GetEventRecorderFor("controller.iamrolebinding.test"),
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()

@@ -120,8 +120,8 @@ type IamRoleReconciler struct {
 	Scheme *runtime.Scheme
 
 	notify        Notifier
-	roleService   iamrole.Interface
-	defaultPolicy string
+	RoleService   iamrole.Interface
+	DefaultPolicy string
 }
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
@@ -145,13 +145,13 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !instance.DeletionTimestamp.IsZero() {
 		// Delete resources
 		logger.Info("Removing IAM Role")
-		out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
+		out, err := r.RoleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 		if err != nil {
 			if !pkgaws.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
 		} else {
-			if err := r.roleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
+			if err := r.RoleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
 				return ctrl.Result{}, err
 			}
 			r.notify.Deleted(instance.GetName())
@@ -194,14 +194,15 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger = logger.WithValues("RoleName", instance.GetName())
 	logger.Info("reconciling iam role")
 	upstream := &iamrole.IamRole{}
-	out, err := r.roleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
+	out, err := r.RoleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
 	if err != nil {
 		if !pkgaws.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		out, err := r.roleService.Create(ctx, &iamrole.CreateOptions{
-			Name:           instance.GetName(),
-			PolicyDocument: r.defaultPolicy,
+		out, err := r.RoleService.Create(ctx, &iamrole.CreateOptions{
+			Name:               instance.GetName(),
+			MaxDurationSeconds: int32(instance.Spec.MaxDurationSeconds),
+			PolicyDocument:     r.DefaultPolicy,
 		})
 		if err != nil {
 			return ctrl.Result{}, err
@@ -225,6 +226,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.notify = &notifier{}
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1alpha1.IamRoleBinding{}, "spec.iamRoleRef", func(obj client.Object) []string {
 		binding, ok := obj.(*v1alpha1.IamRoleBinding)
 		if !ok {

@@ -50,7 +50,7 @@ var _ = Describe("IamRoleController", func() {
 			Client:      mgr.GetClient(),
 			Scheme:      mgr.GetScheme(),
 			notify:      &notifier{},
-			roleService: roleService,
+			RoleService: roleService,
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
 	})

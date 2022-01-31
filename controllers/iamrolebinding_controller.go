@@ -38,20 +38,19 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 )
 
-
 // IamRoleBindingReconciler reconciles a IamRoleBinding object
 type IamRoleBindingReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	record.EventRecorder
 
-	mutex       sync.Mutex
-	bindManager bindmanager.Manager
+	sync.Mutex
+	BindManager bindmanager.Manager
 }
 
 const (
-	IamRoleArnAnnotation    = "eks.amazonaws.com/role-arn"
-	IamRoleBindingFinalizer = "aws.jackhoman.com/revoke-service-account"
+	IamRoleArnAnnotation          = "eks.amazonaws.com/role-arn"
+	IamRoleBindingFinalizer       = "aws.jackhoman.com/revoke-service-account"
 	IamRoleBindingOwnerAnnotation = "aws.jackhoman.com/iam-role-binding"
 )
 
@@ -97,12 +96,12 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !instance.GetDeletionTimestamp().IsZero() {
 		// Object is being deleted
 		if cu.ContainsFinalizer(instance, IamRoleBindingFinalizer) {
-			bound, err := r.bindManager.IsBound(ctx, binding)
+			bound, err := r.BindManager.IsBound(ctx, binding)
 			if err != nil {
 				logger.Error(err, "unable to unbind service account. Failed to get bind status")
 			}
 			if bound {
-				if err := r.bindManager.Unbind(ctx, binding); err != nil {
+				if err := r.BindManager.Unbind(ctx, binding); err != nil {
 					logger.Error(err, "failed to unbind service account")
 				}
 			}
@@ -150,16 +149,16 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Assert that the role ref is of type iam role somewhere
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
-	ok, err := r.bindManager.IsBound(ctx, binding)
+	ok, err := r.BindManager.IsBound(ctx, binding)
 	if err != nil {
 		logger.Error(err, "unable to get bind status")
 		return ctrl.Result{}, err
 	}
 	if !ok {
-		if err := r.bindManager.Bind(ctx, binding); err != nil {
+		if err := r.BindManager.Bind(ctx, binding); err != nil {
 			logger.Error(err, "unable to bind role to service account")
 			return ctrl.Result{}, err
 		}
