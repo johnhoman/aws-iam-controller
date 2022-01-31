@@ -1,4 +1,4 @@
-name: tests
+name: Integration Tests
 env:
   AWS_DEFAULT_REGION: us-east-1
   AWS_DEFAULT_OUTPUT: json
