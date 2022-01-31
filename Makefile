@@ -1,7 +1,7 @@
 GITHUB_REF_NAME ?= $(shell git describe --tags --dirty --always | sed 's/^v//g')
 
 # Image URL to use all building/pushing image targets
-IMG ?= jackhoman.com/aws-iam-controller:$(GITHUB_REF_NAME)
+IMG ?= jackhoman/aws-iam-controller:$(GITHUB_REF_NAME)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -66,9 +66,17 @@ test: manifests generate fmt vet envtest ## Run tests.
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
+
+EKS_OIDC_ARN ?= arn:aws:iam::111122223333:oidc-provider/oidc.eks.region-code.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E
+
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go -metrics-bind-address :8082 -enable-webhook=false
+	go run ./main.go \
+		-metrics-bind-address=:8082 \
+		-enable-webhook=false \
+		-aws-region=us-east-1 \
+		-resource-default-path=smoketests \
+		-oidc-arn=$(EKS_OIDC_ARN)
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.

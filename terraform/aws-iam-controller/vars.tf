@@ -1,3 +1,8 @@
+variable "role-name" {
+  type = string
+  default = "aws-iam-controller"
+}
+
 variable "principal" {
   type = map(string)
 }

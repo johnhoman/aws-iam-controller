@@ -7,9 +7,7 @@ terraform {
   }
 }
 
-provider "aws" {
-  region = "us-east-1"
-}
+provider "aws" {}
 
 resource "aws_iam_role_policy" "aws_iam_controller_policy" {
   name = "aws-iam-controller-policy"
@@ -42,7 +40,7 @@ resource "aws_iam_role_policy" "aws_iam_controller_policy" {
 }
 
 resource "aws_iam_role" "aws_iam_controller" {
-  name = "aws-iam-controller"
+  name = var.role-name
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
