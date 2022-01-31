@@ -5,7 +5,7 @@ jobs:
   terraform:
     defaults:
       run:
-        working-directory: terraform/aws-iam-controller
+        working-directory: terraform
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
