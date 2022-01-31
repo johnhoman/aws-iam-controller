@@ -44,9 +44,16 @@ resource "aws_iam_role" "aws_iam_controller" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
+      Action = "sts:AssumeRoleWithWebIdentity"
       Effect = "Allow"
-      Principal = var.principal
+      Principal = {
+        Federated = "arn:aws:iam::${var.account_id}:oidc-provider/${var.oidc-issuer}"
+      }
+      Condition = {
+        StringEquals = {
+          "${var.oidc-issuer}:sub": "system:serviceaccount:${var.namespace}:${var.service_account}"
+        }
+      }
     }]
   })
 }

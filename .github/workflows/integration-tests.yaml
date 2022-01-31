@@ -1,6 +1,6 @@
 name: tests
 env:
-  AWS_DEFAULT_REGION: us-east-2
+  AWS_DEFAULT_REGION: us-east-1
   AWS_DEFAULT_OUTPUT: json
 on:
   push: {branches: [main]}
@@ -10,6 +10,7 @@ jobs:
     outputs:
       cluster-name: ${{ steps.create-cluster.outputs.cluster-name }}
       oidc-arn: ${{ steps.oidc.outputs.arn }}
+      oidc-issuer: ${{ steps.oidc.outputs.issuer }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -23,14 +24,21 @@ jobs:
         unzip awscliv2.zip
         sudo ./aws/install
     - id: create-cluster
+      env:
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: echo "::set-output name=cluster-name::my-cluster"
       #  eksctl create cluster --name aws-iam-controller-integration-${{ github.run_number }}
       #  echo "::set-output name=cluster-name::aws-iam-controller-integration-${{ github.run_number }}"
     - id: oidc
+      env:
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
-        id=$(aws eks describe-cluster --name ${{ steps.create-cluster.outputs.cluster-name }} --query "cluster.identity.oidc.issuer" --output text | rev | cut -d"/" -f1 | rev)
-        arn=$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList" --output text | grep $id)
+        issuer=$(aws eks describe-cluster --name ${{ steps.create-cluster.outputs.cluster-name }} --query "cluster.identity.oidc.issuer" --output text | sed 's/https:\/\///g')
+        arn=$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList" --output text | grep $issuer)
         echo "::set-output name=arn::$arn"
+        echo "::set-output name=issuer::$issuer"
   terraform:
     needs: [eks]
     outputs:
@@ -38,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/aws-iam-controller
+        working-directory: terraform
     strategy:
       fail-fast: false
       matrix:
@@ -48,8 +56,11 @@ jobs:
     - name: init
       run: terraform init
     - name: apply
+      env:
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
-          terraform apply -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=principal='{"Federated": "${{ needs.eks.outputs.oidc-arn }}"}'
+          terraform apply -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=issuer=${{ needs.eks.outputs.oidc-issuer }}
     - run: echo "::set-output name=role-arn::$(terraform output -raw role-arn)"
       id: role-arn
   integration:
@@ -65,13 +76,15 @@ jobs:
         with:
           username: ${{ DOCKERHUB_USERNAME }}
           password: ${{ DOCKERHUB_ACCESS_TOKEN }}
-      - run: make docker-build
-      - run: make docker-push
+      - run: make docker-build && make docker-push
       - run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
       - run: aws eks update-kubeconfig --name ${{ needs.eks.outputs.cluster-name }}
+        env:
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       - run: make deploy
   cleanup:
     if: always()
