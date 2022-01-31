@@ -19,18 +19,12 @@ spec:
 
 ### IamRoleBinding
 ```yaml
----
 apiVersion: aws.jackhoman.com/v1alpha1
 kind: IamRoleBinding
 metadata:
   name: webservice-binding
   namespace: production
-roleRef:
-  kind: IamRole
-  name: webservice
-  apiGroup: aws.jackhoman.com
-subjects:  
-- kind: ServiceAccount
-  name: webservice
-  namespace: production
+spec:
+  iamRoleRef: webservice
+  serviceAccountRef: webservice
 ```
