@@ -58,7 +58,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	ACK_GINKGO_DEPRECATIONS=1.16.4 go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" ACK_GINKGO_DEPRECATIONS=1.16.4 go test ./... -coverprofile cover.out
 
 ##@ Build
 
@@ -68,7 +68,7 @@ build: generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run ./main.go -metrics-bind-address :8082 -enable-webhook=false
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
