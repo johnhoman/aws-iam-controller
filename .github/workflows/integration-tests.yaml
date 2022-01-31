@@ -18,9 +18,9 @@ jobs:
       env:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      run: echo "::set-output name=cluster-name::my-cluster"
-      #  eksctl create cluster --name aws-iam-controller-integration-${{ github.run_number }}
-      #  echo "::set-output name=cluster-name::aws-iam-controller-integration-${{ github.run_number }}"
+      run: |
+        eksctl create cluster --name aws-iam-controller-integration-${{ github.run_number }}
+        echo "::set-output name=cluster-name::aws-iam-controller-integration-${{ github.run_number }}"
     - id: oidc
       env:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -51,8 +51,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
-          terraform import -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }} aws_iam_role.aws_iam_controller aws-iam-controller || true
-          terraform apply -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }}
+          terraform apply -var=role-name=aws-iam-controller-${{ github.run_number }} -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }}
     - run: echo "::set-output name=role-arn::$(terraform output -raw role-arn)"
       id: role-arn
   integration:
@@ -76,10 +75,6 @@ jobs:
         env:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      - run: kubectl get namespaces
-        env:
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       - run: make deploy
         env:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -93,8 +88,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - run: |
-        eksctl delete cluster ${{ needs.eks.outputs.cluster-name }}-1 || true
+        eksctl delete cluster ${{ needs.eks.outputs.cluster-name }} || true
+      if: always()
     - working-directory: terraform
+      if: always()
       run: |
-        terraform import -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }} aws_iam_role.aws_iam_controller aws-iam-controller || true
-        terraform destroy -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }}
+        terraform import \
+            -var=role-name=aws-iam-controller-${{ github.run_number }} \
+            -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} \
+            -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }} aws_iam_role.aws_iam_controller aws-iam-controller || true
+    - working-directory: terraform
+      if: always()
+      run: |
+        terraform destroy -auto-approve \
+            -var=role-name=aws-iam-controller-${{ github.run_number }} \
+            -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} \
+            -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }}
