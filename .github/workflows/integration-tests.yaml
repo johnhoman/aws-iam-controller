@@ -23,6 +23,8 @@ jobs:
         sudo mv /tmp/eksctl /usr/local/bin
         eksctl create cluster --name aws-iam-controller-integration-${{ github.run_number }}
         echo "::set-output name=cluster-name::aws-iam-controller-integration-${{ github.run_number }}"
+    - if: failed()
+      run: eksctl delete cluster --name aws-iam-controller-integration-${{ github.run_number }}
     - id: oidc
       env:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
