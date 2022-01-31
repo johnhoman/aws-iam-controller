@@ -39,7 +39,8 @@ jobs:
         arn=$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList" --output text | grep $issuer)
         echo "::set-output name=arn::$arn"
         echo "::set-output name=issuer::$issuer"
-  terraform:
+
+  jobs1:
     outputs:
       role-arn: ${{ steps.role-arn.outputs.role-arn }}
     needs: [eks]
