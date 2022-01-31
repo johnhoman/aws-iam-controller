@@ -50,7 +50,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
-          terraform apply -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=issuer=${{ needs.eks.outputs.oidc-issuer }}
+          terraform apply -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=issuer=${{ needs.eks.outputs.oidc-issuer }}
     - run: echo "::set-output name=role-arn::$(terraform output -raw role-arn)"
       id: role-arn
   integration:
@@ -82,3 +82,6 @@ jobs:
     steps:
     - run: |
         eksctl delete cluster ${{ needs.eks.outputs.cluster-name }}-1 || true
+    - working-directory: terraform
+      run: |
+        terraform destroy -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=issuer=${{ needs.eks.outputs.oidc-issuer }}
