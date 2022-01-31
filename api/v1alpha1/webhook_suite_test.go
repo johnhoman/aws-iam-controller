@@ -20,13 +20,15 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"net"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -88,6 +90,9 @@ var _ = BeforeSuite(func() {
 	err = admissionv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = admissionv1beta1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
@@ -113,6 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&v1alpha1.IamRole{}).SetupWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&IamRoleBinding{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:webhook
