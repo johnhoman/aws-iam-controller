@@ -120,6 +120,9 @@ jobs:
     - integration
     - eks
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
     steps:
     - uses: actions/checkout@v2
     - uses: hashicorp/setup-terraform@v1
@@ -131,8 +134,7 @@ jobs:
         sudo mv /tmp/eksctl /usr/local/bin
         eksctl delete cluster ${{ needs.eks.outputs.cluster-name }} || true
       if: always()
-    - working-directory: terraform
-      if: always()
+    - if: always()
       run: |
         terraform import \
             -var=role-name=aws-iam-controller-${{ github.run_number }} \
