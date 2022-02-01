@@ -49,6 +49,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
     - run: terraform init
     - env:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -119,7 +121,10 @@ jobs:
     - eks
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
     - run: terraform init
     - run: |
         curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
@@ -133,9 +138,6 @@ jobs:
             -var=role-name=aws-iam-controller-${{ github.run_number }} \
             -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} \
             -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }} aws_iam_role.aws_iam_controller aws-iam-controller-${{ github.run_number }} || true
-    - working-directory: terraform
-      if: always()
-      run: |
         terraform destroy -auto-approve \
             -var=role-name=aws-iam-controller-${{ github.run_number }} \
             -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} \
