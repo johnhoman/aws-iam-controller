@@ -2,7 +2,7 @@ variable "account_id" {
   type = string
 }
 
-variable "oidc-issuer" {
+variable "oidc_issuer" {
   type = string
 }
 

@@ -55,10 +55,13 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       run: |
-          terraform apply -var=role-name=aws-iam-controller-${{ github.run_number }} -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc-issuer=${{ needs.eks.outputs.oidc-issuer }}
+          terraform apply -var=role-name=aws-iam-controller-${{ github.run_number }} -auto-approve -var=account_id=${{ secrets.AWS_ACCOUNT_ID }} -var=oidc_issuer=${{ needs.eks.outputs.oidc-issuer }}
     - run: echo "::set-output name=role-arn::$(terraform output -raw role-arn)"
       id: role-arn
   integration:
+    env:
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     needs: [terraform,eks]
     runs-on: ubuntu-latest
     strategy:
@@ -76,15 +79,34 @@ jobs:
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
       - run: make docker-build && make docker-push
       - run: aws eks update-kubeconfig --name ${{ needs.eks.outputs.cluster-name }}
-        env:
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       - run: make deploy
-        env:
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      - run: kubectl annotate serviceaccount -n aws-iam-controller-system aws-iam-controller-manager \
+          eks.amazonaws.com/role-arn=${{ needs.terraform.outputs.role-arn }}
+      - run: |-
+          cat <<EOF > ${{ runner.temp }}/patch.json
+          [
+            {
+              "op": "add",
+              "path": "/spec/template/spec/containers/1/args/-",
+              "value": "--oidc-arn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:oidc-provider/${{ needs.eks.outputs.oidc-issuer }}"
+            },
+            {
+              "op": "add",
+              "path": "/spec/template/spec/containers/1/args/-",
+              "value": "--resource-default-path=${{ needs.eks.outputs.cluster-name }}"
+            }
+          ]
+          EOF
+      - run: kubectl patch deployment aws-iam-controller-controller-manager \
+               --namespace aws-iam-controller-system \
+               --type='json' \
+               --patch "$(cat ${{ runner.temp }}/patch.json)"
+      - run: kubectl wait --for=condition=ready pod -l control-plane=controller-manager -n aws-iam-controller-system --timeout=5m
   cleanup:
     if: always()
+    env:
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     needs:
     - terraform
     - integration

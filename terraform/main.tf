@@ -47,11 +47,11 @@ resource "aws_iam_role" "aws_iam_controller" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Effect = "Allow"
       Principal = {
-        Federated = "arn:aws:iam::${var.account_id}:oidc-provider/${var.oidc-issuer}"
+        Federated = "arn:aws:iam::${var.account_id}:oidc-provider/${var.oidc_issuer}"
       }
       Condition = {
         StringEquals = {
-          "${var.oidc-issuer}:sub": "system:serviceaccount:${var.namespace}:${var.service_account}"
+          "${var.oidc_issuer}:sub": "system:serviceaccount:${var.namespace}:${var.service_account}"
         }
       }
     }]
