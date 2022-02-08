@@ -90,6 +90,8 @@ func (i *IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optF
 		}, &http.Response{StatusCode: http.StatusBadRequest}, "GetRole")
 	}
 
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
 	role, ok := i.Roles[aws.ToString(params.RoleName)]
 	if !ok {
 		return &iam.GetRoleOutput{}, wrap(
