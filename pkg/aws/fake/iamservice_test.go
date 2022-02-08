@@ -22,11 +22,9 @@ import (
 	"fmt"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/smithy-go"
-	"net/http"
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	. "github.com/onsi/ginkgo"
@@ -61,18 +59,14 @@ var _ = Describe("IamRoleService", func() {
 			AssumeRolePolicyDocument: aws.String("{}"),
 		})
 		Expect(err).ToNot(Succeed())
-		var re *awshttp.ResponseError
-		Expect(errors.As(err, &re))
-		Expect(re.Response.StatusCode).To(Equal(http.StatusConflict))
+		var e *iamtypes.EntityAlreadyExistsException
+		Expect(errors.As(err, &e))
 	})
 	It("should return not found when a role doesn't exist", func() {
 		_, err := iamService.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String("role-does-not-exist"),
 		})
 		Expect(err).ToNot(Succeed())
-		var re *smithy.OperationError
-		Expect(errors.As(err, &re))
-		Expect(re.Unwrap().(*awshttp.ResponseError).HTTPStatusCode()).To(Equal(http.StatusNotFound))
 		er := &iamtypes.NoSuchEntityException{}
 		Expect(errors.As(err, &er)).To(BeTrue())
 	})
@@ -86,7 +80,8 @@ var _ = Describe("IamRoleService", func() {
 			RoleName: aws.String("should-delete-a-role"),
 		})
 		Expect(err).To(Succeed())
-		Expect(iamService.Roles).ToNot(HaveKey("should-delete-a-role"))
+		_, ok := iamService.Roles.Load("should-delete-a-role")
+		Expect(ok).ToNot(BeTrue())
 	})
 	It("should get the role", func() {
 		out, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
@@ -95,7 +90,7 @@ var _ = Describe("IamRoleService", func() {
 		})
 		Expect(err).To(Succeed())
 		Expect(aws.ToString(out.Role.RoleName)).To(Equal("should-get-a-role"))
-		Expect(aws.ToString(out.Role.Arn)).To(Equal(fmt.Sprintf("arn:aws:iam::%s:role/should-get-a-role", fake.AWSAccountId)))
+		Expect(aws.ToString(out.Role.Arn)).To(Equal(fmt.Sprintf("arn:aws:iam::%s:role/should-get-a-role", iamService.AccountID)))
 		Expect(aws.ToString(out.Role.AssumeRolePolicyDocument)).To(Equal(url.QueryEscape("{}")))
 	})
 	It("should update the role", func() {

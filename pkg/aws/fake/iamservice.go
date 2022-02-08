@@ -21,118 +21,84 @@ import (
 	"fmt"
 	"github.com/aws/smithy-go"
 	"math/rand"
-	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	transporthttp "github.com/aws/smithy-go/transport/http"
 
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
-const (
-	AWSAccountId = "012345678912"
-)
-
-type IamService struct {
-	sync.Mutex
-	// RoleName -> Role
-	Roles map[string]iamtypes.Role
-	// Policies []iamtypes.Policy
+type Cache struct {
+	Roles sync.Map
 }
 
-func (i *IamService) UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	in := &iam.GetRoleInput{RoleName: params.RoleName}
-	_, err := i.GetRole(ctx, in)
-	if err != nil {
-		return &iam.UpdateAssumeRolePolicyOutput{}, err
-	}
-	role := i.Roles[aws.ToString(params.RoleName)]
+type IamService struct {
+	AccountID string
+	Cache
+}
+
+func (i *IamService) Reset() {
+	i.Cache = Cache{Roles: sync.Map{}}
+}
+
+func (i *IamService) UpdateAssumeRolePolicy(_ context.Context, params *iam.UpdateAssumeRolePolicyInput, _ ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
+	iRole, _ := i.Roles.Load(aws.ToString(params.RoleName))
+	role := iRole.(*iamtypes.Role)
 	role.AssumeRolePolicyDocument = aws.String(url.QueryEscape(*params.PolicyDocument))
-	i.Roles[aws.ToString(params.RoleName)] = role
+	i.Roles.Store(aws.ToString(params.RoleName), role)
 	return &iam.UpdateAssumeRolePolicyOutput{}, nil
 }
 
-func (i *IamService) UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	in := &iam.GetRoleInput{RoleName: params.RoleName}
-	out, err := i.GetRole(ctx, in)
-	if err != nil {
-		return &iam.UpdateRoleOutput{}, err
-	}
-	roleName := aws.ToString(out.Role.RoleName)
-	role := i.Roles[roleName]
+func (i *IamService) UpdateRole(_ context.Context, params *iam.UpdateRoleInput, _ ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
+	iRole, _ := i.Roles.Load(aws.ToString(params.RoleName))
+	role := iRole.(*iamtypes.Role)
 	if params.Description != nil {
 		role.Description = params.Description
 	}
 	if params.MaxSessionDuration != nil {
 		role.MaxSessionDuration = params.MaxSessionDuration
 	}
-	i.Roles[roleName] = role
+	i.Roles.Store(aws.ToString(params.RoleName), role)
 	return &iam.UpdateRoleOutput{}, nil
 }
 
-func (i *IamService) GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
-	re := regexp.MustCompile(`[\w+=,.@-]+`)
-	if !re.MatchString(aws.ToString(params.RoleName)) {
-		return nil, wrap(&iamtypes.InvalidInputException{
-			Message: aws.String("invalid role name"),
-		}, &http.Response{StatusCode: http.StatusBadRequest}, "GetRole")
-	}
+func (i *IamService) GetRole(_ context.Context, params *iam.GetRoleInput, _ ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
 
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	role, ok := i.Roles[aws.ToString(params.RoleName)]
+	iRole, ok := i.Roles.Load(aws.ToString(params.RoleName))
 	if !ok {
-		return &iam.GetRoleOutput{}, wrap(
-			&iamtypes.NoSuchEntityException{},
-			&http.Response{StatusCode: http.StatusNotFound},
-			"GetRole",
-		)
+		return nil, &iamtypes.NoSuchEntityException{}
 	}
-	return &iam.GetRoleOutput{Role: &role}, nil
+	return &iam.GetRoleOutput{Role: iRole.(*iamtypes.Role)}, nil
 }
 
-func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
-	in := &iam.GetRoleInput{RoleName: params.RoleName}
-	if _, err := i.GetRole(ctx, in); err == nil {
-		return &iam.CreateRoleOutput{}, wrap(
-			&iamtypes.EntityAlreadyExistsException{},
-			&http.Response{StatusCode: http.StatusConflict},
-			"CreateRole",
-		)
-	}
-	if params.AssumeRolePolicyDocument == nil {
-		return &iam.CreateRoleOutput{}, &smithy.OperationError{Err: &smithy.InvalidParamsError{}}
+func (i *IamService) CreateRole(_ context.Context, params *iam.CreateRoleInput, _ ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
+	_, ok := i.Roles.Load(aws.ToString(params.RoleName))
+	if ok {
+		return nil, &iamtypes.EntityAlreadyExistsException{}
 	}
 
-	arn := fmt.Sprintf("arn:aws:iam::%s:role", AWSAccountId)
+	if params.AssumeRolePolicyDocument == nil {
+		return nil, &smithy.InvalidParamsError{}
+	}
+
+	arn := fmt.Sprintf("arn:aws:iam::%s:role", i.AccountID)
 	if params.Path != nil {
 		path := aws.ToString(params.Path)
 		if path != "/" {
 			if !strings.HasPrefix(path, "/") || !strings.HasSuffix(path, "/") {
-				return &iam.CreateRoleOutput{}, wrap(
-					&iamtypes.InvalidInputException{},
-					&http.Response{StatusCode: http.StatusBadRequest},
-					"CreateRole",
-				)
+				return nil, &iamtypes.InvalidInputException{}
 			}
 			arn = arn + "/" + strings.Trim(path, "/")
 		}
 	}
 	arn = arn + "/" + aws.ToString(params.RoleName)
 
-	iamRole := iamtypes.Role{}
+	iamRole := &iamtypes.Role{}
 	iamRole.RoleId = aws.String(randStringSuffix("AROA"))
 	iamRole.RoleName = params.RoleName
 	iamRole.Arn = aws.String(arn)
@@ -146,29 +112,26 @@ func (i *IamService) CreateRole(ctx context.Context, params *iam.CreateRoleInput
 		PermissionsBoundaryArn: params.PermissionsBoundary,
 	}
 
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	i.Roles[aws.ToString(iamRole.RoleName)] = iamRole
-	return &iam.CreateRoleOutput{Role: &iamRole}, nil
+	i.Roles.Store(aws.ToString(params.RoleName), iamRole)
+	return &iam.CreateRoleOutput{Role: iamRole}, nil
 }
 
-func (i *IamService) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
-	in := &iam.GetRoleInput{RoleName: params.RoleName}
-	out, err := i.GetRole(ctx, in)
-	if err != nil {
-		return &iam.DeleteRoleOutput{}, err
+func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, _ ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
+	_, ok := i.Roles.Load(aws.ToString(params.RoleName))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
 	}
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	delete(i.Roles, aws.ToString(out.Role.RoleName))
-	// TODO: delete conflicts
+
+	i.Roles.Delete(aws.ToString(params.RoleName))
 	return &iam.DeleteRoleOutput{}, nil
 }
 
 var _ pkgaws.IamService = &IamService{}
 
 func NewIamService() *IamService {
-	return &IamService{Roles: make(map[string]iamtypes.Role)}
+	i := &IamService{AccountID: "012345678912"}
+	i.Reset()
+	return i
 }
 
 func init() {
@@ -182,16 +145,4 @@ func randStringSuffix(p string) string {
 		b[i] = runes[rand.Intn(len(runes))]
 	}
 	return p + string(b)
-}
-
-func wrap(err error, res *http.Response, opName string) error {
-	return &smithy.OperationError{
-		OperationName: opName,
-		Err: &awshttp.ResponseError{
-			ResponseError: &transporthttp.ResponseError{
-				Response: &transporthttp.Response{Response: res},
-				Err:      err,
-			},
-		},
-	}
 }
