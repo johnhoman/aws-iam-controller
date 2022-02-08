@@ -1,15 +1,18 @@
 package bindmanager
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 )
 
 type Binding struct {
-	Role           *v1alpha1.IamRole
-	ServiceAccount *corev1.ServiceAccount
+	Role            *v1alpha1.IamRole
+	ServiceAccounts []string
+}
+
+func (b *Binding) GetNamespace() string {
+	return b.Role.GetNamespace()
 }
 
 type condition struct {

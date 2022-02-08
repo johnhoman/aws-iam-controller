@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
@@ -26,7 +25,7 @@ type bindManager struct {
 // Bind will establish a trust relationship between a role and a service account
 // by allowing the service account to AssumeRoleWithWebIdentity
 func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
-	sid := sidLabel(binding.ServiceAccount.Name, binding.ServiceAccount.Namespace)
+	sid := sidLabel(binding.Role.Name, binding.Role.Namespace)
 	upstream, err := b.Get(ctx, &iamrole.GetOptions{Name: binding.Role.GetName()})
 	if err != nil {
 		return err
@@ -43,26 +42,49 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 			found = k
 		}
 	}
+
+	serviceAccounts := make([]string, 0, len(binding.ServiceAccounts))
+	for _, name := range serviceAccounts {
+		serviceAccounts = append(
+			serviceAccounts,
+			serviceAccountFormat(binding.GetNamespace(), name),
+		)
+	}
+	// If there's no service account then remove the statement
+	var accounts interface{} = serviceAccounts
+	if len(serviceAccounts) == 1 {
+		accounts = serviceAccounts[0]
+	}
+
 	stmt := statement{
 		Sid:       sid,
 		Effect:    EffectAllow,
 		Principal: principal{Federated: b.oidcArn},
 		Action:    ActionAssumeRoleWithWebIdentity,
 		Condition: condition{
-			StringEquals: map[string]interface{}{
-				b.issuer: fmt.Sprintf(
-					SubjectFormat,
-					binding.ServiceAccount.GetNamespace(),
-					binding.ServiceAccount.GetName(),
-				),
-			},
+			StringEquals: map[string]interface{}{b.issuer: accounts},
 		},
 	}
 	if found < 0 {
-		doc.Statements = append(doc.Statements, stmt)
+		// Not found
+		if len(binding.ServiceAccounts) > 0 {
+			doc.Statements = append(doc.Statements, stmt)
+		}
 	} else {
-		doc.Statements[found] = stmt
+		// Found
+		if len(binding.ServiceAccounts) == 0 {
+			statements := make([]statement, 0, len(doc.Statements)-1)
+			for k, stm := range doc.Statements {
+				if k != found {
+					statements = append(statements, stm)
+				}
+			}
+			doc.Statements = statements
+		} else {
+			doc.Statements[found] = stmt
+		}
 	}
+
 	if !reflect.DeepEqual(doc, original) {
 		trust, err := doc.Marshal()
 		if err != nil {
@@ -76,65 +98,6 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 		}
 	}
 	return nil
-}
-
-func (b *bindManager) Unbind(ctx context.Context, binding *Binding) error {
-	// This is not great -- it exposes an implementation detail of the naming of roles
-	upstream, err := b.Get(ctx, &iamrole.GetOptions{Name: binding.Role.GetName()})
-	if err != nil {
-		return err
-	}
-	doc := &policyDocument{}
-	if err := doc.Unmarshal(upstream.TrustPolicy); err != nil {
-		return err
-	}
-	sid := sidLabel(binding.ServiceAccount.Name, binding.ServiceAccount.Namespace)
-
-	statements := make([]statement, 0, len(doc.Statements)-1)
-	for _, stmt := range doc.Statements {
-		if stmt.Sid != sid {
-			statements = append(statements, stmt)
-		}
-	}
-	if len(statements) < len(doc.Statements) {
-		doc.Statements = statements
-		trust, err := doc.Marshal()
-		if err != nil {
-			return err
-		}
-		_, err = b.Update(ctx, &iamrole.UpdateOptions{
-			Name:           binding.Role.GetName(),
-			PolicyDocument: trust,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// IsBound returns true if the expected statement id for the service account
-// existing in the iam role's trust policy
-func (b *bindManager) IsBound(ctx context.Context, binding *Binding) (bool, error) {
-	upstream, err := b.Get(ctx, &iamrole.GetOptions{Name: binding.Role.GetName()})
-	if err != nil {
-		return false, err
-	}
-	doc := &policyDocument{}
-	if err := doc.Unmarshal(upstream.TrustPolicy); err != nil {
-		return false, err
-	}
-	sid := sidLabel(binding.ServiceAccount.Name, binding.ServiceAccount.Namespace)
-	for _, stmt := range doc.Statements {
-		if stmt.Sid == sid {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (b *bindManager) Patch(binding *Binding, options ...client.PatchOption) Patch {
-	return &patch{binding: binding, options: options}
 }
 
 var _ Manager = &bindManager{}
@@ -151,6 +114,10 @@ func sidLabel(name, namespace string) string {
 	sid = strings.Title(sid)
 	sid = strings.ReplaceAll(sid, " ", "")
 	return sid
+}
+
+func serviceAccountFormat(namespace, name string) string {
+	return fmt.Sprintf(SubjectFormat, namespace, name)
 }
 
 func SidLabel(name, namespace string) string {

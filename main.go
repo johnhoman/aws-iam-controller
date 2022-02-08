@@ -145,17 +145,9 @@ func main() {
 		Scheme:        mgr.GetScheme(),
 		RoleService:   service,
 		DefaultPolicy: string(raw),
+		Manager:       bindmanager.New(service, oidcArn),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IamRole")
-		os.Exit(1)
-	}
-	if err = (&controllers.IamRoleBindingReconciler{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor("iamrolebindingreconciler.controller"),
-		BindManager:   bindmanager.New(service, oidcArn),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "IamRoleBinding")
 		os.Exit(1)
 	}
 

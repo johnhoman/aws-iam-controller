@@ -21,6 +21,7 @@ import (
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -122,8 +123,10 @@ type IamRoleReconciler struct {
 	notify        Notifier
 	RoleService   iamrole.Interface
 	DefaultPolicy string
+	bindmanager.Manager
 }
 
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamrolebindings,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/finalizers,verbs=update
@@ -196,6 +199,23 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *IamRoleReconciler) UpdateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
+	k8s := client.NewNamespacedClient(r.Client, instance.GetNamespace())
+	logger := log.FromContext(ctx).WithValues("method", "UpdateTrustPolicy")
+	logger.Info("updating trust policy for iam role")
+
+	bindings := &v1alpha1.IamRoleBindingList{}
+	if err := k8s.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef": instance.GetName()}); err != nil {
+		return err
+	}
+	names := make([]string, len(bindings.Items))
+	for _, binding := range bindings.Items {
+		names = append(names, binding.Spec.ServiceAccountRef)
+	}
+	binding := bindmanager.Binding{Role: instance, ServiceAccounts: names}
+	if err := r.Bind(ctx, &binding); err != nil {
+		return err
+	}
+
 	return nil
 }
 

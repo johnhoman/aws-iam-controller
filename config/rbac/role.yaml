@@ -11,27 +11,9 @@ rules:
   resources:
   - iamrolebindings
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - aws.jackhoman.com
-  resources:
-  - iamrolebindings/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - aws.jackhoman.com
-  resources:
-  - iamrolebindings/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - aws.jackhoman.com
   resources:
@@ -54,6 +36,32 @@ rules:
   - aws.jackhoman.com
   resources:
   - iamroles/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/status
   verbs:
   - get
   - patch
