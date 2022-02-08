@@ -144,30 +144,16 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if !instance.DeletionTimestamp.IsZero() {
 		// Delete resources
-		logger.Info("Removing IAM Role")
-		out, err := r.RoleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
-		if err != nil {
-			if !pkgaws.IsNotFound(err) {
-				return ctrl.Result{}, err
-			}
-		} else {
-			if err := r.RoleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
-				return ctrl.Result{}, err
-			}
-			r.notify.Deleted(instance.GetName())
-			logger.Info("Removed upstream role", "arn", out.Arn)
+		if err := r.Finalize(ctx, instance); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		if cu.ContainsFinalizer(instance, Finalizer) {
 			// Need to establish ownership above to remove this finalizer if it somehow
 			// already exists on the object
-			patch := client.MergeFrom(instance.DeepCopy())
-			cu.RemoveFinalizer(instance, Finalizer)
-			if err := k8.Patch(ctx, instance, patch, FieldOwner); err != nil {
-				logger.Error(err, "unable to patch finalizers")
+			if err := r.RemoveFinalizer(ctx, instance); err != nil {
 				return ctrl.Result{}, err
 			}
-			logger.Info("removed finalizer")
 		}
 		return ctrl.Result{}, nil
 	}
@@ -175,18 +161,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// isn't owned by this controller this prevents it from being owned
 	// TODO: fix this
 	if !cu.ContainsFinalizer(instance, Finalizer) {
-		patch := &unstructured.Unstructured{Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers": []string{Finalizer},
-			},
-		}}
-		patch.SetName(instance.GetName())
-		patch.SetGroupVersionKind(instance.GroupVersionKind())
-		logger.Info("adding finalizer")
-		if err := k8.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := k8.Get(ctx, req.NamespacedName, instance); err != nil {
+		if err := r.AddFinalizer(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -199,11 +174,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if !pkgaws.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		out, err := r.RoleService.Create(ctx, &iamrole.CreateOptions{
-			Name:               instance.GetName(),
-			MaxDurationSeconds: int32(instance.Spec.MaxDurationSeconds),
-			PolicyDocument:     r.DefaultPolicy,
-		})
+		out, err := r.CreateIamRole(ctx, instance)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -222,6 +193,72 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *IamRoleReconciler) UpdateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
+	return nil
+}
+
+func (r *IamRoleReconciler) CreateIamRole(ctx context.Context, instance *v1alpha1.IamRole) (*iamrole.IamRole, error) {
+	out, err := r.RoleService.Create(ctx, &iamrole.CreateOptions{
+		Name:               instance.GetName(),
+		MaxDurationSeconds: int32(instance.Spec.MaxDurationSeconds),
+		PolicyDocument:     r.DefaultPolicy,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *IamRoleReconciler) AddFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
+	k8 := client.NewNamespacedClient(r.Client, instance.GetNamespace())
+	logger := log.FromContext(ctx).WithValues("method", "AddFinalizer")
+	patch := &unstructured.Unstructured{Object: map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"finalizers": []string{Finalizer},
+		},
+	}}
+	patch.SetName(instance.GetName())
+	patch.SetGroupVersionKind(instance.GroupVersionKind())
+	logger.Info("adding finalizer")
+	if err := k8.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *IamRoleReconciler) RemoveFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
+	k8 := client.NewNamespacedClient(r.Client, instance.GetNamespace())
+	logger := log.FromContext(ctx).WithValues("method", "RemoveFinalizer")
+
+	patch := client.MergeFrom(instance.DeepCopy())
+	cu.RemoveFinalizer(instance, Finalizer)
+	if err := k8.Patch(ctx, instance, patch, FieldOwner); err != nil {
+		logger.Error(err, "unable to patch finalizers")
+		return err
+	}
+	logger.Info("removed finalizer")
+	return nil
+}
+
+func (r *IamRoleReconciler) Finalize(ctx context.Context, instance *v1alpha1.IamRole) error {
+	logger := log.FromContext(ctx).WithValues("method", "Finalize")
+	logger.Info("Removing IAM Role")
+
+	out, err := r.RoleService.Get(ctx, &iamrole.GetOptions{Name: instance.GetName()})
+	if err != nil {
+		if !pkgaws.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if err := r.RoleService.Delete(ctx, &iamrole.DeleteOptions{Name: instance.GetName()}); err != nil {
+			return err
+		}
+		r.notify.Deleted(instance.GetName())
+		logger.Info("Removed upstream role", "arn", out.Arn)
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
