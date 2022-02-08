@@ -3,7 +3,9 @@ env:
   AWS_DEFAULT_REGION: us-east-1
   AWS_DEFAULT_OUTPUT: text
 on:
-  push: {branches: [main]}
+  push:
+    branches-ignore:
+    - *
 jobs:
   eks:
     outputs:
