@@ -3,29 +3,23 @@ package controllers
 import (
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	"github.com/johnhoman/controller-tools/manager"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ServiceaccountController", func() {
-	var iamRole *v1alpha1.IamRole
-	var binding *v1alpha1.IamRoleBinding
-	var serviceAccount *corev1.ServiceAccount
+var _ = Describe("IamRoleBindingController", func() {
 	var it manager.IntegrationTest
-	var serviceAccountName = "controller-test"
-
 	BeforeEach(func() {
 		it = manager.IntegrationTestBuilder().
 			WithScheme(scheme.Scheme).
 			Complete(cfg)
 
-		err := (&ServiceAccountReconciler{
+		err := (&IamRoleBindingReconciler{
 			Client:        it.GetClient(),
 			Scheme:        it.GetScheme(),
 			EventRecorder: it.GetEventRecorderFor("controller.test"),
@@ -35,91 +29,88 @@ var _ = Describe("ServiceaccountController", func() {
 		it.StartManager()
 	})
 	AfterEach(func() { it.StopManager() })
-	When("The iam role exists", func() {
+	When("the RoleBinding role exists", func() {
+		var randomName string
+		var binding *v1alpha1.IamRoleBinding
 		BeforeEach(func() {
-			iamRole = &v1alpha1.IamRole{}
-			iamRole.SetName("iam-role-name-with-path")
-			iamRole.Spec.Description = "the iam role exists"
-			iamRole.Spec.MaxDurationSeconds = 7200
-
-			it.Eventually().Create(iamRole).Should(Succeed())
-			iamRole.Status.RoleArn = "arn:aws:iam::0123456789012:role/iam-role-name-with-path"
-			Expect(it.Uncached().Status().Update(it.GetContext(), iamRole)).Should(Succeed())
-			it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, iamRole, func(obj client.Object) bool {
-				return len(obj.(*v1alpha1.IamRole).Status.RoleArn) > 0
-			}).Should(Succeed())
+			randomName = "integration-test"
+			binding = &v1alpha1.IamRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randomName,
+				},
+				Spec: v1alpha1.IamRoleBindingSpec{
+					IamRoleRef:        randomName,
+					ServiceAccountRef: randomName,
+				},
+			}
+			it.Eventually().Create(binding).Should(Succeed())
 		})
-		When("The role binding exists", func() {
+		When("the role does exist", func() {
+			var iamRole *v1alpha1.IamRole
+			var iamRoleArn = "arn:aws:iam::123456789012:role/s3access"
 			BeforeEach(func() {
-				binding = &v1alpha1.IamRoleBinding{}
-				binding.SetName("iam-role-name-with-path")
-				binding.Spec.ServiceAccountRef = serviceAccountName
-				binding.Spec.IamRoleRef = iamRole.GetName()
-
-				it.Eventually().Create(binding).Should(Succeed())
+				iamRole = &v1alpha1.IamRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: randomName,
+					},
+					Spec: v1alpha1.IamRoleSpec{},
+				}
+				it.Eventually().Create(iamRole).Should(Succeed())
+				iamRole.Status.RoleArn = iamRoleArn
+				Expect(it.Uncached().Status().Update(it.GetContext(), iamRole)).Should(Succeed())
+				it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &v1alpha1.IamRole{}, func(obj client.Object) bool {
+					return obj.(*v1alpha1.IamRole).Status.RoleArn == iamRoleArn
+				}).Should(Succeed())
 			})
-			When("The service account is created", func() {
+			When("the service account exists", func() {
+				var serviceAccount *corev1.ServiceAccount
 				BeforeEach(func() {
-					serviceAccount = &corev1.ServiceAccount{}
-					serviceAccount.SetName(serviceAccountName)
-
+					serviceAccount = &corev1.ServiceAccount{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: randomName,
+						},
+					}
 					it.Eventually().Create(serviceAccount).Should(Succeed())
 				})
-				It("annotates the service account", func() {
+				It("Annotates the service account", func() {
 					instance := &corev1.ServiceAccount{}
-					it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, instance, func(obj client.Object) bool {
-						return metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
+					it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
+						return len(obj.GetAnnotations()) > 0
 					}).Should(Succeed())
-					Expect(instance.GetAnnotations()).To(HaveKeyWithValue(RoleArnAnnotation, iamRole.Status.RoleArn))
+					Expect(instance.GetAnnotations()).To(HaveKeyWithValue(ServiceAccountAnnotation, iamRoleArn))
+
 				})
-				When("the service account annotation is removed", func() {
-					BeforeEach(func() {
-						instance := &corev1.ServiceAccount{}
-						it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, instance, func(obj client.Object) bool {
-							return metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
-						}).Should(Succeed())
-						Expect(instance.GetAnnotations()).To(HaveKeyWithValue(RoleArnAnnotation, iamRole.Status.RoleArn))
-						patch := client.MergeFrom(instance.DeepCopy())
-						instance.SetAnnotations(map[string]string{})
-						Expect(it.Uncached().Patch(it.GetContext(), instance, patch)).Should(Succeed())
-					})
-					It("annotates the service account", func() {
-						instance := &corev1.ServiceAccount{}
-						it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, instance, func(obj client.Object) bool {
-							return metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
-						}).Should(Succeed())
-						Expect(instance.GetAnnotations()).To(HaveKeyWithValue(RoleArnAnnotation, iamRole.Status.RoleArn))
-					})
-				})
-				When("the role binding is deleted", func() {
-					BeforeEach(func() {
-						it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
-							return metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
-						}).Should(Succeed())
-						it.Expect().Delete(binding).Should(Succeed())
-					})
-					It("removes the annotation", func() {
-						it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
-							return !metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
-						}).Should(Succeed())
-					})
+				It("Updates the status", func() {
+					instance := &v1alpha1.IamRoleBinding{}
+					it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
+						b := obj.(*v1alpha1.IamRoleBinding)
+						return len(b.Status.BoundIamRoleArn) > 0 && len(b.Status.BoundServiceAccountRef) > 0
+					}).Should(Succeed())
+					Expect(instance.Status.BoundServiceAccountRef).Should(Equal(randomName))
+					Expect(instance.Status.BoundIamRoleArn).Should(Equal(iamRoleArn))
 				})
 			})
 		})
-		When("the role binding doesn't exist", func() {
-			When("the service account is annotated", func() {
-				JustBeforeEach(func() {
-					serviceAccount = &corev1.ServiceAccount{}
-					serviceAccount.SetName(serviceAccountName)
-					serviceAccount.SetAnnotations(map[string]string{RoleArnAnnotation: iamRole.Status.RoleArn})
-
+		When("the role does not exist", func() {
+			When("the service account exists", func() {
+				var serviceAccount *corev1.ServiceAccount
+				BeforeEach(func() {
+					serviceAccount = &corev1.ServiceAccount{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: randomName,
+						},
+					}
 					it.Eventually().Create(serviceAccount).Should(Succeed())
 				})
-				It("should not remove the annotation", func() {
-					instance := &corev1.ServiceAccount{}
-					it.Eventually().GetWhen(types.NamespacedName{Name: serviceAccountName}, instance, func(obj client.Object) bool {
-						return !metav1.HasAnnotation(obj.(*corev1.ServiceAccount).ObjectMeta, RoleArnAnnotation)
-					}).ShouldNot(Succeed())
+				It("does not annotate the service account", func() {
+					Consistently(func() map[string]string {
+						instance := &corev1.ServiceAccount{}
+						err := it.Uncached().Get(it.GetContext(), types.NamespacedName{Name: randomName}, instance)
+						if err != nil {
+							return map[string]string{ServiceAccountFinalizer: ""}
+						}
+						return instance.GetAnnotations()
+					}).ShouldNot(HaveKey(ServiceAccountFinalizer))
 				})
 			})
 		})

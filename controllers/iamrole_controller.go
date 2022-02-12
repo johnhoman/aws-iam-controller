@@ -164,7 +164,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// isn't owned by this controller this prevents it from being owned
 	// TODO: fix this
 	if !cu.ContainsFinalizer(instance, Finalizer) {
-		if err := r.AddFinalizer(ctx, instance); err != nil {
+		if err := r.addFinalizer(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -177,7 +177,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if !pkgaws.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		out, err := r.CreateIamRole(ctx, instance)
+		out, err := r.createIamRole(ctx, instance)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -198,7 +198,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
-func (r *IamRoleReconciler) UpdateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
+func (r *IamRoleReconciler) updateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
 	k8s := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx).WithValues("method", "UpdateTrustPolicy")
 	logger.Info("updating trust policy for iam role")
@@ -219,7 +219,7 @@ func (r *IamRoleReconciler) UpdateTrustPolicy(ctx context.Context, instance *v1a
 	return nil
 }
 
-func (r *IamRoleReconciler) CreateIamRole(ctx context.Context, instance *v1alpha1.IamRole) (*iamrole.IamRole, error) {
+func (r *IamRoleReconciler) createIamRole(ctx context.Context, instance *v1alpha1.IamRole) (*iamrole.IamRole, error) {
 	out, err := r.RoleService.Create(ctx, &iamrole.CreateOptions{
 		Name:               instance.GetName(),
 		MaxDurationSeconds: int32(instance.Spec.MaxDurationSeconds),
@@ -231,7 +231,7 @@ func (r *IamRoleReconciler) CreateIamRole(ctx context.Context, instance *v1alpha
 	return out, nil
 }
 
-func (r *IamRoleReconciler) AddFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
+func (r *IamRoleReconciler) addFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
 	k8 := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx).WithValues("method", "AddFinalizer")
 	patch := &unstructured.Unstructured{Object: map[string]interface{}{
