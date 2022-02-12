@@ -72,7 +72,7 @@ var _ = Describe("IamRoleBindingController", func() {
 					}
 					it.Eventually().Create(serviceAccount).Should(Succeed())
 				})
-				It("Annotates the service account", func() {
+				It("annotates the service account", func() {
 					instance := &corev1.ServiceAccount{}
 					it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
 						return len(obj.GetAnnotations()) > 0
@@ -80,7 +80,7 @@ var _ = Describe("IamRoleBindingController", func() {
 					Expect(instance.GetAnnotations()).To(HaveKeyWithValue(ServiceAccountAnnotation, iamRoleArn))
 
 				})
-				It("Updates the status", func() {
+				It("updates the status", func() {
 					instance := &v1alpha1.IamRoleBinding{}
 					it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
 						b := obj.(*v1alpha1.IamRoleBinding)
@@ -88,6 +88,55 @@ var _ = Describe("IamRoleBindingController", func() {
 					}).Should(Succeed())
 					Expect(instance.Status.BoundServiceAccountRef).Should(Equal(randomName))
 					Expect(instance.Status.BoundIamRoleArn).Should(Equal(iamRoleArn))
+				})
+				When("the role binding is deleted", func() {
+					BeforeEach(func() {
+						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
+							meta := obj.(*corev1.ServiceAccount).ObjectMeta
+							return metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+						}).Should(Succeed())
+					})
+					JustBeforeEach(func() {
+						it.Expect().Delete(binding).Should(Succeed())
+					})
+					It("removes the service account annotation", func() {
+						instance := &corev1.ServiceAccount{}
+						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
+							meta := obj.(*corev1.ServiceAccount).ObjectMeta
+							return !metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+						}).Should(Succeed())
+					})
+				})
+				When("the service account ref is changed", func() {
+					var other *corev1.ServiceAccount
+					BeforeEach(func() {
+						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
+							meta := obj.(*corev1.ServiceAccount).ObjectMeta
+							return metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+						}).Should(Succeed())
+						other = &corev1.ServiceAccount{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "other",
+							},
+						}
+						it.Eventually().Create(other).Should(Succeed())
+
+						instance := &v1alpha1.IamRoleBinding{}
+						it.Eventually().Get(types.NamespacedName{Name: randomName}, instance).Should(Succeed())
+						patch := client.MergeFrom(instance.DeepCopy())
+						instance.Spec.ServiceAccountRef = "other"
+						Expect(it.Uncached().Patch(it.GetContext(), instance, patch)).Should(Succeed())
+						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(o client.Object) bool {
+							return o.(*v1alpha1.IamRoleBinding).Spec.ServiceAccountRef == "other"
+						}).Should(Succeed())
+					})
+					It("removes the service account annotation from the old service account", func() {
+						instance := &corev1.ServiceAccount{}
+						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
+							meta := obj.(*corev1.ServiceAccount).ObjectMeta
+							return !metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+						}).Should(Succeed())
+					})
 				})
 			})
 		})

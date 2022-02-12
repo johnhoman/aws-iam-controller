@@ -68,6 +68,18 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ctrl.Result{}, err
 		}
 	}
+	if len(instance.Status.BoundServiceAccountRef) > 0 && instance.Status.BoundServiceAccountRef != instance.Spec.ServiceAccountRef {
+		logger.Info("sync service accounts",
+			"have",
+			instance.Status.BoundServiceAccountRef,
+			"want",
+			instance.Spec.ServiceAccountRef,
+		)
+		if err := r.finalize(ctx, instance); err != nil {
+			logger.Error(err, "unable to remove binding from service account")
+			return ctrl.Result{}, err
+		}
+	}
 
 	iamRole := &awsv1alpha1.IamRole{}
 	if err := r.Client.Get(ctx, types.NamespacedName{
@@ -90,10 +102,6 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 	if instance.Status.BoundServiceAccountRef != instance.Spec.ServiceAccountRef || instance.Status.BoundIamRoleArn != iamRole.Status.RoleArn {
-		if err := r.finalize(ctx, instance); err != nil {
-			logger.Error(err, "unable to remove binding from service account")
-			return ctrl.Result{}, err
-		}
 		patch := client.MergeFrom(instance.DeepCopy())
 		instance.Status.BoundServiceAccountRef = instance.Spec.ServiceAccountRef
 		instance.Status.BoundIamRoleArn = iamRole.Status.RoleArn
