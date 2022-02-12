@@ -26,6 +26,8 @@ type IamRoleBindingSpec struct {
 }
 
 type IamRoleBindingStatus struct {
+	BoundServiceAccountRef string `json:"serviceAccount,omitempty"`
+	BoundIamRoleArn        string `json:"iamRoleArn,omitempty"`
 }
 
 //+kubebuilder:object:root=true

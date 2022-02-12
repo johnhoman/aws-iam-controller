@@ -51,6 +51,11 @@ spec:
             - serviceAccountRef
             type: object
           status:
+            properties:
+              iamRoleArn:
+                type: string
+              serviceAccount:
+                type: string
             type: object
         type: object
     served: true
