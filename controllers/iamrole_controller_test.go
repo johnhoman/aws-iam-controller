@@ -191,8 +191,13 @@ var _ = Describe("IamRoleController", func() {
 
 					obj := &v1alpha1.IamRole{}
 					mgr.Expect().Get(key, obj).Should(Succeed())
+
+					patch := client.MergeFrom(obj.DeepCopy())
 					obj.Spec.Description = "Updating for recreate"
-					mgr.Expect().Update(obj).Should(Succeed())
+					Expect(mgr.Uncached().Patch(mgr.GetContext(), obj, patch)).Should(Succeed())
+					mgr.Eventually().GetWhen(types.NamespacedName{Name: obj.GetName()}, &v1alpha1.IamRole{}, func(o client.Object) bool {
+						return o.(*v1alpha1.IamRole).Spec.Description == obj.Spec.Description
+					}).Should(Succeed())
 				})
 				It("Should recreate", func() {
 					Eventually(func() error {
