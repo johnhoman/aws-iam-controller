@@ -114,6 +114,12 @@ var _ = Describe("IamRoleController", func() {
 				}).Should(ContainSubstring(
 					fmt.Sprintf("system:serviceaccount:%s:%s", iamRoleBinding.GetNamespace(), name),
 				))
+				iamRole := &v1alpha1.IamRole{}
+				mgr.Eventually().GetWhen(types.NamespacedName{Name: instance.GetName()}, iamRole, func(o client.Object) bool {
+					return len(o.(*v1alpha1.IamRole).Status.BoundServiceAccounts) > 0
+				}).Should(Succeed())
+				Expect(iamRole.Status.BoundServiceAccounts[0].Namespace).To(Equal(iamRoleBinding.GetNamespace()))
+				Expect(iamRole.Status.BoundServiceAccounts[0].Name).To(Equal(name))
 			})
 		})
 		When("it's being deleted", func() {
