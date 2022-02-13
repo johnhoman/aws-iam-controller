@@ -11,8 +11,8 @@ import (
 )
 
 type Client struct {
-	service   pkgaws.IamRoleService
-	namespace string
+	service pkgaws.IamRoleService
+	path    string
 }
 
 func (c *Client) Create(ctx context.Context, options *CreateOptions) (*IamRole, error) {
@@ -22,7 +22,7 @@ func (c *Client) Create(ctx context.Context, options *CreateOptions) (*IamRole, 
 		RoleName:                 aws.String(options.Name),
 		Description:              aws.String(options.Description),
 		MaxSessionDuration:       aws.Int32(options.MaxDurationSeconds),
-		Path:                     aws.String(fmt.Sprintf("/%s/", c.namespace)),
+		Path:                     aws.String(fmt.Sprintf("/%s/", c.path)),
 	})
 	if err != nil {
 		return rv, err
@@ -88,65 +88,5 @@ func (c *Client) Delete(ctx context.Context, options *DeleteOptions) error {
 var _ Interface = &Client{}
 
 func New(service pkgaws.IamRoleService, path string) *Client {
-	return &Client{service: service, namespace: path}
-}
-
-type namespacedClient struct {
-	client    Interface
-	namespace string
-}
-
-func (n *namespacedClient) Create(ctx context.Context, options *CreateOptions) (*IamRole, error) {
-	_, err := n.client.Create(ctx, &CreateOptions{
-		Name:               fmt.Sprintf("%s-%s", n.namespace, options.Name),
-		Description:        options.Description,
-		MaxDurationSeconds: options.MaxDurationSeconds,
-		PolicyDocument:     options.PolicyDocument,
-	})
-	if err != nil {
-		return &IamRole{}, err
-	}
-	return n.Get(ctx, &GetOptions{Name: options.Name})
-}
-
-func (n *namespacedClient) Update(ctx context.Context, options *UpdateOptions) (*IamRole, error) {
-	_, err := n.client.Update(ctx, &UpdateOptions{
-		Name:               fmt.Sprintf("%s-%s", n.namespace, options.Name),
-		Description:        options.Description,
-		MaxDurationSeconds: options.MaxDurationSeconds,
-		PolicyDocument:     options.PolicyDocument,
-	})
-	if err != nil {
-		return &IamRole{}, err
-	}
-	return n.Get(ctx, &GetOptions{Name: options.Name})
-}
-
-func (n *namespacedClient) Get(ctx context.Context, options *GetOptions) (*IamRole, error) {
-	out, err := n.client.Get(ctx, &GetOptions{
-		Name: fmt.Sprintf("%s-%s", n.namespace, options.Name),
-	})
-	if err != nil {
-		return &IamRole{}, err
-	}
-	return &IamRole{
-		Name:        options.Name,
-		Arn:         out.Arn,
-		CreateDate:  out.CreateDate,
-		Description: out.Description,
-		TrustPolicy: out.TrustPolicy,
-		Id:          out.Id,
-	}, nil
-}
-
-func (n *namespacedClient) Delete(ctx context.Context, options *DeleteOptions) error {
-	return n.client.Delete(ctx, &DeleteOptions{
-		Name: fmt.Sprintf("%s-%s", n.namespace, options.Name),
-	})
-}
-
-var _ Interface = &namespacedClient{}
-
-func NewNamespacedClient(c Interface, namespace string) *namespacedClient {
-	return &namespacedClient{client: c, namespace: namespace}
+	return &Client{service: service, path: path}
 }
