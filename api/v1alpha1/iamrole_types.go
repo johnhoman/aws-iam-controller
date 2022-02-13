@@ -44,6 +44,7 @@ type IamRoleStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:scope=Cluster
 
 // IamRole is the Schema for the iamroles API
 type IamRole struct {

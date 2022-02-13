@@ -42,6 +42,10 @@ var _ = Describe("IamRoleController", func() {
 		iamService = newIamService()
 		roleService = iamrole.New(iamService, "controller-test")
 
+		c, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(c).ToNot(BeNil())
+
 		mgr = manager.IntegrationTestBuilder().
 			WithScheme(scheme.Scheme).
 			Complete(cfg)
@@ -56,10 +60,12 @@ var _ = Describe("IamRoleController", func() {
 	})
 	AfterEach(func() { mgr.StopManager() })
 	When("the resource exists", func() {
+		var name string
 		var instance *v1alpha1.IamRole
-		var name = "the-resource-exists-" + uuid.New().String()[:8]
-		var key = types.NamespacedName{Name: name}
+		var key types.NamespacedName
 		BeforeEach(func() {
+			name = "the-resource-exists-" + uuid.New().String()[:8]
+			key = types.NamespacedName{Name: name}
 			instance = &v1alpha1.IamRole{}
 			instance.SetName(name)
 			instance.SetFinalizers([]string{"keep"})
@@ -67,7 +73,7 @@ var _ = Describe("IamRoleController", func() {
 			mgr.Eventually().Create(instance).Should(Succeed())
 			instance = &v1alpha1.IamRole{}
 			mgr.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
-				return len(instance.GetFinalizers()) > 1
+				return cu.ContainsFinalizer(obj, Finalizer)
 			}).Should(Succeed())
 		})
 		When("it's being deleted", func() {
@@ -80,17 +86,14 @@ var _ = Describe("IamRoleController", func() {
 						return cu.ContainsFinalizer(obj, Finalizer)
 					}).Should(Succeed())
 				})
-				When("The upstream resource exists", func() {
+				When("the upstream resource exists", func() {
 					BeforeEach(func() {
 						Eventually(func() error {
 							_, err := roleService.Get(mgr.GetContext(), &iamrole.GetOptions{Name: instance.GetName()})
 							return err
 						}).Should(Succeed())
 					})
-					JustBeforeEach(func() {
-						mgr.Expect().Delete(instance.DeepCopy()).Should(Succeed())
-					})
-					It("Should delete the resource", func() {
+					It("should delete the resource", func() {
 						Eventually(func() error {
 							_, err := roleService.Get(mgr.GetContext(), &iamrole.GetOptions{Name: instance.GetName()})
 							return err
@@ -104,7 +107,13 @@ var _ = Describe("IamRoleController", func() {
 				})
 				When("The upstream resource does not exist", func() {
 					BeforeEach(func() {
-						Expect(roleService.Delete(mgr.GetContext(), &iamrole.DeleteOptions{Name: instance.GetName()})).Should(Succeed())
+						Eventually(func() error {
+							_, err := roleService.Get(mgr.GetContext(), &iamrole.GetOptions{Name: instance.GetName()})
+							return err
+						}).ShouldNot(HaveOccurred())
+						Expect(roleService.Delete(mgr.GetContext(), &iamrole.DeleteOptions{
+							Name: instance.GetName(),
+						})).Should(Succeed())
 						Eventually(func() error {
 							_, err := roleService.Get(mgr.GetContext(), &iamrole.GetOptions{Name: instance.GetName()})
 							return err

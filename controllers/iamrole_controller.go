@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -138,16 +137,18 @@ type IamRoleReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	k8 := client.NewNamespacedClient(r.Client, req.Namespace)
 
 	instance := &v1alpha1.IamRole{}
-	if err := k8.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
+		logger.Error(err, "unable to get instance")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if !instance.DeletionTimestamp.IsZero() {
+		logger.Info("instance pending deletion")
 		// Delete resources
 		if err := r.Finalize(ctx, instance); err != nil {
+			logger.Error(err, "unable to finalize instance")
 			return ctrl.Result{}, err
 		}
 
@@ -155,6 +156,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Need to establish ownership above to remove this finalizer if it somehow
 			// already exists on the object
 			if err := r.RemoveFinalizer(ctx, instance); err != nil {
+				logger.Error(err, "an error occurring removing the finalizer")
 				return ctrl.Result{}, err
 			}
 		}
@@ -164,9 +166,12 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// isn't owned by this controller this prevents it from being owned
 	// TODO: fix this
 	if !cu.ContainsFinalizer(instance, Finalizer) {
+		logger.Info("adding finalizer")
 		if err := r.addFinalizer(ctx, instance); err != nil {
+			logger.Error(err, "unable to add finalizer")
 			return ctrl.Result{}, err
 		}
+		logger.Info("added finalizer")
 	}
 
 	logger = logger.WithValues("RoleName", instance.GetName())
@@ -177,34 +182,39 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if !pkgaws.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
+		logger.Info("upstream iam role not found")
 		out, err := r.createIamRole(ctx, instance)
 		if err != nil {
+			logger.Error(err, "unable to create iam role")
 			return ctrl.Result{}, err
 		}
 		r.notify.Created(out.Name)
 		*upstream = *out
+		logger.Info("created upstream iam role", "arn", upstream.Arn)
 	} else {
 		*upstream = *out
+		logger.Info("upstream iam role exists", "arn", upstream.Arn)
 	}
-	old := instance.DeepCopy()
-	instance.Status.RoleArn = upstream.Arn
-	if !reflect.DeepEqual(old.Status, instance.Status) {
-		patch := client.MergeFrom(old)
-		if err := k8.Status().Patch(ctx, instance, patch); err != nil {
+	if instance.Status.RoleArn != upstream.Arn {
+		logger.Info("Status out of sync", "have", instance.Status.RoleArn, "want", upstream.Arn)
+		patch := client.MergeFrom(instance.DeepCopy())
+		instance.Status.RoleArn = upstream.Arn
+		if err := r.Client.Status().Patch(ctx, instance, patch); err != nil {
+			logger.Error(err, "unable to update status")
 			return ctrl.Result{}, err
 		}
+		logger.Info("Status updated")
 	}
-
+	logger.Info("Reconcile complete")
 	return ctrl.Result{}, nil
 }
 
 func (r *IamRoleReconciler) updateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
-	k8s := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx).WithValues("method", "UpdateTrustPolicy")
 	logger.Info("updating trust policy for iam role")
 
 	bindings := &v1alpha1.IamRoleBindingList{}
-	if err := k8s.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef": instance.GetName()}); err != nil {
+	if err := r.Client.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef": instance.GetName()}); err != nil {
 		return err
 	}
 	names := make([]string, len(bindings.Items))
@@ -232,7 +242,6 @@ func (r *IamRoleReconciler) createIamRole(ctx context.Context, instance *v1alpha
 }
 
 func (r *IamRoleReconciler) addFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
-	k8 := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx).WithValues("method", "AddFinalizer")
 	patch := &unstructured.Unstructured{Object: map[string]interface{}{
 		"metadata": map[string]interface{}{
@@ -241,20 +250,20 @@ func (r *IamRoleReconciler) addFinalizer(ctx context.Context, instance *v1alpha1
 	}}
 	patch.SetName(instance.GetName())
 	patch.SetGroupVersionKind(instance.GroupVersionKind())
-	logger.Info("adding finalizer")
-	if err := k8.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
+	if err := r.Client.Patch(ctx, patch, client.Apply, FieldOwner, client.ForceOwnership); err != nil {
+		logger.Error(err, "unable to add finalizer")
 		return err
 	}
+	logger.Info("patched finalizer")
 	return nil
 }
 
 func (r *IamRoleReconciler) RemoveFinalizer(ctx context.Context, instance *v1alpha1.IamRole) error {
-	k8 := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx).WithValues("method", "RemoveFinalizer")
 
 	patch := client.MergeFrom(instance.DeepCopy())
 	cu.RemoveFinalizer(instance, Finalizer)
-	if err := k8.Patch(ctx, instance, patch, FieldOwner); err != nil {
+	if err := r.Client.Patch(ctx, instance, patch, FieldOwner); err != nil {
 		logger.Error(err, "unable to patch finalizers")
 		return err
 	}
