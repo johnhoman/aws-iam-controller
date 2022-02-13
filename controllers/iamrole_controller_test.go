@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +44,10 @@ var _ = Describe("IamRoleController", func() {
 	BeforeEach(func() {
 		iamService = newIamService()
 		roleService = iamrole.New(iamService, "controller-test")
+		bm := bindmanager.New(
+			roleService,
+			"arn:aws:iam::111122223333:oidc-provider/oidc.eks.region-code.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E",
+		)
 
 		c, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 		Expect(err).ShouldNot(HaveOccurred())
@@ -50,11 +57,17 @@ var _ = Describe("IamRoleController", func() {
 			WithScheme(scheme.Scheme).
 			Complete(cfg)
 
+		policy := defaultPolicy()
+		raw, err := json.Marshal(policy)
+		Expect(err).To(BeNil())
+
 		Expect((&IamRoleReconciler{
-			Client:      mgr.GetClient(),
-			Scheme:      mgr.GetScheme(),
-			notify:      &notifier{},
-			RoleService: roleService,
+			Client:        mgr.GetClient(),
+			Scheme:        mgr.GetScheme(),
+			notify:        &notifier{},
+			DefaultPolicy: string(raw),
+			RoleService:   roleService,
+			Manager:       bm,
 		}).SetupWithManager(mgr)).Should(Succeed())
 		mgr.StartManager()
 	})
@@ -75,6 +88,33 @@ var _ = Describe("IamRoleController", func() {
 			mgr.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
 				return cu.ContainsFinalizer(obj, Finalizer)
 			}).Should(Succeed())
+		})
+		When("a role binding is created", func() {
+			// var serviceAccount *corev1.ServiceAccount
+			var iamRoleBinding *v1alpha1.IamRoleBinding
+			BeforeEach(func() {
+				iamRoleBinding = &v1alpha1.IamRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: v1alpha1.IamRoleBindingSpec{
+						IamRoleRef:        corev1.LocalObjectReference{Name: name},
+						ServiceAccountRef: corev1.LocalObjectReference{Name: name},
+					},
+				}
+				mgr.Eventually().Create(iamRoleBinding).Should(Succeed())
+			})
+			It("updates the trust policy", func() {
+				Eventually(func() string {
+					role, err := roleService.Get(mgr.GetContext(), &iamrole.GetOptions{Name: name})
+					if err != nil {
+						return ""
+					}
+					return role.TrustPolicy
+				}).Should(ContainSubstring(
+					fmt.Sprintf("system:serviceaccount:%s:%s", iamRoleBinding.GetNamespace(), name),
+				))
+			})
 		})
 		When("it's being deleted", func() {
 			JustBeforeEach(func() {

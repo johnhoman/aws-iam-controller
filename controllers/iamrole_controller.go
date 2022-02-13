@@ -23,9 +23,11 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -126,7 +128,7 @@ type IamRoleReconciler struct {
 }
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamrolebindings,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;create;update;patch;delete;
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/finalizers,verbs=update
 
@@ -195,6 +197,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		*upstream = *out
 		logger.Info("upstream iam role exists", "arn", upstream.Arn)
 	}
+
 	if instance.Status.RoleArn != upstream.Arn {
 		logger.Info("Status out of sync", "have", instance.Status.RoleArn, "want", upstream.Arn)
 		patch := client.MergeFrom(instance.DeepCopy())
@@ -205,25 +208,46 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		logger.Info("Status updated")
 	}
+	if err := r.updateTrustPolicy(ctx, instance); err != nil {
+		logger.Error(err, "unable to update trust policy")
+		return ctrl.Result{}, err
+	}
+
 	logger.Info("Reconcile complete")
 	return ctrl.Result{}, nil
 }
 
 func (r *IamRoleReconciler) updateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
 	logger := log.FromContext(ctx).WithValues("method", "UpdateTrustPolicy")
-	logger.Info("updating trust policy for iam role")
+	logger.V(4).Info("updating trust policy for iam role")
 
 	bindings := &v1alpha1.IamRoleBindingList{}
-	if err := r.Client.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef": instance.GetName()}); err != nil {
+	if err := r.Client.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef.name": instance.GetName()}); err != nil {
+		logger.Error(err, "unable to list role bindings")
 		return err
 	}
-	names := make([]string, len(bindings.Items))
+	for _, item := range bindings.Items {
+		logger.V(4).Info("identified role binding", "bindingName", item.Name)
+	}
+	objectRefs := make([]corev1.ObjectReference, 0, len(bindings.Items))
 	for _, binding := range bindings.Items {
-		names = append(names, binding.Spec.ServiceAccountRef)
+		objectRefs = append(objectRefs, corev1.ObjectReference{
+			Name:      binding.Spec.ServiceAccountRef.Name,
+			Namespace: binding.GetNamespace(),
+		})
 	}
-	binding := bindmanager.Binding{Role: instance, ServiceAccounts: names}
+	binding := bindmanager.Binding{Role: instance, ServiceAccounts: objectRefs}
 	if err := r.Bind(ctx, &binding); err != nil {
+		logger.Error(err, "unable to bind service account")
 		return err
+	}
+	if !reflect.DeepEqual(instance.Status.BoundServiceAccounts, objectRefs) {
+		patch := client.MergeFrom(instance.DeepCopy())
+		instance.Status.BoundServiceAccounts = objectRefs
+		if err := r.Client.Status().Patch(ctx, instance, patch); err != nil {
+			logger.Error(err, "unable to update status")
+		}
+		logger.Info("updated status with role bindings")
 	}
 
 	return nil
@@ -293,12 +317,12 @@ func (r *IamRoleReconciler) Finalize(ctx context.Context, instance *v1alpha1.Iam
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.notify = &notifier{}
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1alpha1.IamRoleBinding{}, "spec.iamRoleRef", func(obj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1alpha1.IamRoleBinding{}, "spec.iamRoleRef.name", func(obj client.Object) []string {
 		binding, ok := obj.(*v1alpha1.IamRoleBinding)
 		if !ok {
 			return []string{}
 		}
-		return []string{binding.Spec.IamRoleRef}
+		return []string{binding.Spec.IamRoleRef.Name}
 	}); err != nil {
 		return err
 	}
@@ -312,7 +336,7 @@ func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if ok {
 					return []ctrl.Request{{
 						NamespacedName: types.NamespacedName{
-							Name:      binding.Spec.IamRoleRef,
+							Name:      binding.Spec.IamRoleRef.Name,
 							Namespace: binding.GetNamespace(),
 						},
 					}}

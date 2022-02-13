@@ -32,6 +32,7 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 	}
 	original := &policyDocument{}
 	doc := &policyDocument{}
+	// TODO: make sure trust policy is not empty
 	if err := doc.Unmarshal(upstream.TrustPolicy); err != nil {
 		return err
 	}
@@ -44,10 +45,10 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 	}
 
 	serviceAccounts := make([]string, 0, len(binding.ServiceAccounts))
-	for _, name := range serviceAccounts {
+	for _, ref := range binding.ServiceAccounts {
 		serviceAccounts = append(
 			serviceAccounts,
-			serviceAccountFormat(binding.GetNamespace(), name),
+			serviceAccountFormat(ref.Namespace, ref.Name),
 		)
 	}
 	// If there's no service account then remove the statement

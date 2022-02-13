@@ -17,17 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type IamRoleBindingSpec struct {
-	IamRoleRef        string `json:"iamRoleRef"`
-	ServiceAccountRef string `json:"serviceAccountRef"`
+	IamRoleRef        corev1.LocalObjectReference `json:"iamRoleRef"`
+	ServiceAccountRef corev1.LocalObjectReference `json:"serviceAccountRef"`
 }
 
 type IamRoleBindingStatus struct {
-	BoundServiceAccountRef string `json:"serviceAccount,omitempty"`
-	BoundIamRoleArn        string `json:"iamRoleArn,omitempty"`
+	BoundServiceAccountRef corev1.LocalObjectReference `json:"serviceAccount,omitempty"`
+	BoundIamRoleArn        string                      `json:"iamRoleArn,omitempty"`
 }
 
 //+kubebuilder:object:root=true

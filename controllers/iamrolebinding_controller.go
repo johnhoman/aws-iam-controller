@@ -31,6 +31,7 @@ const (
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamrolebindings/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamrolebindings/finalizers,verbs=update
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles/status,verbs=get;
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;patch;update;
 
 func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -68,7 +69,7 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ctrl.Result{}, err
 		}
 	}
-	if len(instance.Status.BoundServiceAccountRef) > 0 && instance.Status.BoundServiceAccountRef != instance.Spec.ServiceAccountRef {
+	if len(instance.Status.BoundServiceAccountRef.Name) > 0 && instance.Status.BoundServiceAccountRef != instance.Spec.ServiceAccountRef {
 		logger.Info("sync service accounts",
 			"have",
 			instance.Status.BoundServiceAccountRef,
@@ -83,7 +84,7 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	iamRole := &awsv1alpha1.IamRole{}
 	if err := r.Client.Get(ctx, types.NamespacedName{
-		Name: instance.Spec.IamRoleRef,
+		Name: instance.Spec.IamRoleRef.Name,
 		// TODO: remove namespace when iam role is switched to cluster scope
 		Namespace: instance.Namespace,
 	}, iamRole); err != nil {
@@ -129,7 +130,7 @@ func (r *IamRoleBindingReconciler) bindServiceAccount(
 	logger := log.FromContext(ctx).WithValues(keysAndValues...)
 
 	serviceAccount := &corev1.ServiceAccount{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Spec.ServiceAccountRef}, serviceAccount); err != nil {
+	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Spec.ServiceAccountRef.Name}, serviceAccount); err != nil {
 		logger.Error(err, "unable to get service account")
 		return err
 	}
@@ -160,11 +161,11 @@ func (r *IamRoleBindingReconciler) finalize(ctx context.Context, instance *awsv1
 	// Remove bound service account annotation
 	k8s := client.NewNamespacedClient(r.Client, instance.GetNamespace())
 	logger := log.FromContext(ctx, "finalize", instance.Status.BoundServiceAccountRef)
-	if instance.Status.BoundServiceAccountRef == "" {
+	if instance.Status.BoundServiceAccountRef.Name == "" {
 		return nil
 	}
 	serviceAccount := &corev1.ServiceAccount{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Status.BoundServiceAccountRef}, serviceAccount); err != nil {
+	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Status.BoundServiceAccountRef.Name}, serviceAccount); err != nil {
 		logger.Error(err, "unable to get service account")
 		return client.IgnoreNotFound(err)
 	}

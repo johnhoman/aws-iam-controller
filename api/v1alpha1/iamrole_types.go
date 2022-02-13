@@ -38,8 +38,8 @@ type IamRoleSpec struct {
 type IamRoleStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	RoleArn              string                        `json:"arn,omitempty"`
-	BoundServiceAccounts []corev1.LocalObjectReference `json:"boundServiceAccounts,omitempty"`
+	RoleArn              string                   `json:"arn,omitempty"`
+	BoundServiceAccounts []corev1.ObjectReference `json:"boundServiceAccounts,omitempty"`
 }
 
 //+kubebuilder:object:root=true
