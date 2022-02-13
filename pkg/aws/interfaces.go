@@ -21,11 +21,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
+
+type IamPolicyService interface {
+	CreatePolicy(context.Context, *iam.CreatePolicyInput, ...func(*iam.Options)) (*iam.CreatePolicyOutput, error)
+	DeletePolicy(context.Context, *iam.DeletePolicyInput, ...func(*iam.Options)) (*iam.DeletePolicyOutput, error)
+}
+
+
 type IamRoleService interface {
-	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
-	GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
-	UpdateRole(ctx context.Context, params *iam.UpdateRoleInput, optFns ...func(*iam.Options)) (*iam.UpdateRoleOutput, error)
-	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
+	CreateRole(context.Context, *iam.CreateRoleInput, ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
+	GetRole(context.Context, *iam.GetRoleInput, ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	UpdateRole(context.Context, *iam.UpdateRoleInput, ...func(*iam.Options)) (*iam.UpdateRoleOutput, error)
+	DeleteRole(context.Context, *iam.DeleteRoleInput, ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
 
 	UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error)
 }
@@ -33,4 +40,5 @@ type IamRoleService interface {
 // IamService interfaces with an upstream AWS account to create iam resources
 type IamService interface {
 	IamRoleService
+	IamPolicyService
 }
