@@ -103,6 +103,16 @@ var _ = Describe("IamRoleController", func() {
 					},
 				}
 				mgr.Eventually().Create(iamRoleBinding).Should(Succeed())
+				iamRoleBinding2 := &v1alpha1.IamRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name + "2",
+					},
+					Spec: v1alpha1.IamRoleBindingSpec{
+						IamRoleRef:        corev1.LocalObjectReference{Name: name},
+						ServiceAccountRef: corev1.LocalObjectReference{Name: name + "2"},
+					},
+				}
+				mgr.Eventually().Create(iamRoleBinding2).Should(Succeed())
 			})
 			It("updates the trust policy", func() {
 				Eventually(func() string {
@@ -116,10 +126,15 @@ var _ = Describe("IamRoleController", func() {
 				))
 				iamRole := &v1alpha1.IamRole{}
 				mgr.Eventually().GetWhen(types.NamespacedName{Name: instance.GetName()}, iamRole, func(o client.Object) bool {
-					return len(o.(*v1alpha1.IamRole).Status.BoundServiceAccounts) > 0
+					return len(o.(*v1alpha1.IamRole).Status.BoundServiceAccounts) > 1
 				}).Should(Succeed())
-				Expect(iamRole.Status.BoundServiceAccounts[0].Namespace).To(Equal(iamRoleBinding.GetNamespace()))
-				Expect(iamRole.Status.BoundServiceAccounts[0].Name).To(Equal(name))
+				// This might not always work this way
+				Expect(iamRole.Status.BoundServiceAccounts).To(ContainElement(
+					corev1.ObjectReference{Name: name, Namespace: iamRoleBinding.GetNamespace()},
+				))
+				Expect(iamRole.Status.BoundServiceAccounts).To(ContainElement(
+					corev1.ObjectReference{Name: name + "2", Namespace: iamRoleBinding.GetNamespace()},
+				))
 			})
 		})
 		When("it's being deleted", func() {
