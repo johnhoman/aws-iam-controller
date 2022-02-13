@@ -19,6 +19,7 @@ package fake
 import (
     "context"
     "fmt"
+    pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
     "net/url"
     "strings"
 
@@ -109,3 +110,4 @@ func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, 
     return &iam.DeleteRoleOutput{}, nil
 }
 
+var _ pkgaws.IamRoleService = &IamService{}
