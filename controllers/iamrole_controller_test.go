@@ -64,6 +64,7 @@ var _ = Describe("IamRoleController", func() {
 		Expect((&IamRoleReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
+			EventRecorder: mgr.GetEventRecorderFor("controller.test"),
 			notify:        &notifier{},
 			DefaultPolicy: string(raw),
 			RoleService:   roleService,

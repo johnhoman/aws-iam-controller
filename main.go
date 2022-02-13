@@ -143,6 +143,7 @@ func main() {
 	if err = (&controllers.IamRoleReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("controller.iamrole"),
 		RoleService:   service,
 		DefaultPolicy: string(raw),
 		Manager:       bindmanager.New(service, oidcArn),
