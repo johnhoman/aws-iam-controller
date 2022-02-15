@@ -17,67 +17,139 @@ limitations under the License.
 package fake
 
 import (
-    "context"
-    "fmt"
-    "net/url"
-    "strings"
-    "time"
+	"context"
+	"fmt"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/aws/aws-sdk-go-v2/aws"
-    "github.com/aws/aws-sdk-go-v2/service/iam"
-    iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
-func(i *IamService) CreatePolicy(_ context.Context, p *iam.CreatePolicyInput, _ ...func(*iam.Options)) (*iam.CreatePolicyOutput, error) {
+func (i *IamService) CreatePolicy(_ context.Context, p *iam.CreatePolicyInput, _ ...func(*iam.Options)) (*iam.CreatePolicyOutput, error) {
 
-    if _, ok := i.ManagedPolicies.Load(aws.ToString(p.PolicyName)); ok {
-        return nil, &iamtypes.EntityAlreadyExistsException{}
-    }
+	if _, ok := i.ManagedPolicies.Load(aws.ToString(p.PolicyName)); ok {
+		return nil, &iamtypes.EntityAlreadyExistsException{}
+	}
 
-    out := &iam.CreatePolicyOutput{}
-    path := aws.String("/")
-    if p.Path != nil { path = p.Path }
+	out := &iam.CreatePolicyOutput{}
+	path := aws.String("/")
+	if p.Path != nil {
+		path = p.Path
+	}
 
-    if !strings.HasSuffix(*path, "/") || !strings.HasPrefix(*path, "/") {
-        return nil, &iamtypes.InvalidInputException{}
-    }
+	if !strings.HasSuffix(*path, "/") || !strings.HasPrefix(*path, "/") {
+		return nil, &iamtypes.InvalidInputException{}
+	}
 
-    policy := iamtypes.Policy{
-        Arn: aws.String(fmt.Sprintf("arn:aws:iam::%s:policy%s%s", i.AccountID, *path, *p.PolicyName)),
-        AttachmentCount: aws.Int32(0),
-        CreateDate: aws.Time(time.Now().UTC()),
-        DefaultVersionId: aws.String("v1"),
-        Description: p.Description,
-        IsAttachable: true,
-        Path: p.Path,
-        PolicyId: aws.String(randStringSuffix("ANPA")),
-        PolicyName: p.PolicyName,
-    }
-    out.Policy = &policy
+	policy := iamtypes.Policy{
+		Arn:              aws.String(fmt.Sprintf("arn:aws:iam::%s:policy%s%s", i.AccountID, *path, *p.PolicyName)),
+		AttachmentCount:  aws.Int32(0),
+		CreateDate:       aws.Time(time.Now().UTC()),
+		DefaultVersionId: aws.String("v1"),
+		Description:      p.Description,
+		IsAttachable:     true,
+		Path:             p.Path,
+		PolicyId:         aws.String(randStringSuffix("ANPA")),
+		PolicyName:       p.PolicyName,
+	}
+	out.Policy = &policy
 
-    document := aws.String(url.QueryEscape(aws.ToString(p.PolicyDocument)))
-    version := iamtypes.PolicyVersion{
-        Document: document,
-        VersionId: aws.String("v1"),
-        IsDefaultVersion: true,
-        CreateDate: aws.Time(time.Now().UTC()),
-    }
+	document := aws.String(url.QueryEscape(aws.ToString(p.PolicyDocument)))
+	version := iamtypes.PolicyVersion{
+		Document:         document,
+		VersionId:        aws.String("v1"),
+		IsDefaultVersion: true,
+		CreateDate:       aws.Time(time.Now().UTC()),
+	}
 
-    mp := managedPolicy{
-        versions: [5]iamtypes.PolicyVersion{version},
-        policy: policy,
-    }
-    i.Cache.ManagedPolicies.Store(aws.ToString(policy.PolicyName), mp)
-    return out, nil
+	mp := managedPolicy{
+		versions: &policyVersions{Map: sync.Map{}},
+		policy:   policy,
+	}
+	mp.versions.Store("v1", version)
+	i.Cache.ManagedPolicies.Store(aws.ToString(policy.PolicyName), mp)
+	i.Cache.policyArnMapping.Store(
+		aws.ToString(policy.Arn),
+		aws.ToString(policy.PolicyName),
+	)
+	return out, nil
 }
 
-func(i *IamService) DeletePolicy(_ context.Context, p *iam.DeletePolicyInput, _ ...func(*iam.Options)) (*iam.DeletePolicyOutput, error) {
-    parts := strings.Split(aws.ToString(p.PolicyArn), "/")
-    name := parts[len(parts)-1]
+func (i *IamService) CreatePolicyVersion(_ context.Context, in *iam.CreatePolicyVersionInput, _ ...func(*iam.Options)) (*iam.CreatePolicyVersionOutput, error) {
+	name, ok := i.Cache.policyArnMapping.Load(aws.ToString(in.PolicyArn))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	v, _ := i.Cache.ManagedPolicies.Load(name)
+	mp := v.(managedPolicy)
+	number := aws.ToString(mp.versions.Latest().VersionId)[1:]
+	latest, _ := strconv.Atoi(number)
 
-    _, ok := i.Cache.ManagedPolicies.LoadAndDelete(name)
-    if !ok {
-        return nil, &iamtypes.NoSuchEntityException{}
-    }
-    return &iam.DeletePolicyOutput{}, nil
+	version := iamtypes.PolicyVersion{
+		CreateDate: aws.Time(time.Now().UTC()),
+		VersionId:  aws.String(fmt.Sprintf("v%d", latest+1)),
+		Document:   in.PolicyDocument,
+	}
+	if in.SetAsDefault {
+		version.IsDefaultVersion = true
+	}
+	if mp.versions.Len() < 5 {
+		if version.IsDefaultVersion {
+			mp.versions.Range(func(key, value interface{}) bool {
+				v := value.(iamtypes.PolicyVersion)
+				if value.(iamtypes.PolicyVersion).IsDefaultVersion {
+					iFace, _ := mp.versions.Load(aws.ToString(v.VersionId))
+					ver := iFace.(iamtypes.PolicyVersion)
+					ver.IsDefaultVersion = false
+					mp.versions.Store(aws.ToString(v.VersionId), ver)
+					return false
+				}
+				return true
+			})
+		}
+		mp.versions.Store(aws.ToString(version.VersionId), version)
+
+	} else if mp.versions.Len() == 5 {
+		return nil, &iamtypes.LimitExceededException{}
+	}
+	out := &iam.CreatePolicyVersionOutput{}
+	out.PolicyVersion = &version
+	return out, nil
 }
+
+func (i *IamService) DeletePolicy(_ context.Context, p *iam.DeletePolicyInput, _ ...func(*iam.Options)) (*iam.DeletePolicyOutput, error) {
+	name, ok := i.Cache.policyArnMapping.LoadAndDelete(aws.ToString(p.PolicyArn))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+
+	i.Cache.ManagedPolicies.Delete(name)
+	return &iam.DeletePolicyOutput{}, nil
+}
+
+func (i *IamService) DeletePolicyVersion(_ context.Context, in *iam.DeletePolicyVersionInput, _ ...func(*iam.Options)) (*iam.DeletePolicyVersionOutput, error) {
+	name, ok := i.policyArnMapping.Load(aws.ToString(in.PolicyArn))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	// Cannot delete the policies default version
+	pol, _ := i.ManagedPolicies.Load(name)
+	mp := pol.(managedPolicy)
+	v, ok := mp.versions.Load(aws.ToString(in.VersionId))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	if v.(iamtypes.PolicyVersion).IsDefaultVersion {
+		return nil, &iamtypes.DeleteConflictException{}
+	}
+	mp.versions.Delete(aws.ToString(in.VersionId))
+	return &iam.DeletePolicyVersionOutput{}, nil
+}
+
+var _ pkgaws.IamPolicyService = &IamService{}

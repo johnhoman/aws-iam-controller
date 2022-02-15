@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.13.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.16.0
 	github.com/aws/smithy-go v1.10.0
+	github.com/deckarep/golang-set v1.8.0
 	github.com/google/uuid v1.1.2
 	github.com/johnhoman/controller-tools v0.0.0-20220130205403-48b6692ecfd3
 	github.com/onsi/ginkgo v1.16.5
