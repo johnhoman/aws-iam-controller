@@ -69,23 +69,23 @@ var _ = Describe("Iam Policy", func() {
 		Expect(errors.As(err, &er)).Should(BeTrue())
 		Expect(out).Should(BeNil())
 	})
-    When("the policy exists", func() {
+	When("the policy exists", func() {
 		var p *iamtypes.Policy
-        BeforeEach(func() {
-            in := inputCache.Pop("AWSHealthFullAccess")
-            out, err := service.CreatePolicy(ctx, in)
-            Expect(err).ToNot(HaveOccurred())
-            Expect(out).ToNot(BeNil())
+		BeforeEach(func() {
+			in := inputCache.Pop("AWSHealthFullAccess")
+			out, err := service.CreatePolicy(ctx, in)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out).ToNot(BeNil())
 			p = out.Policy
-        })
-        It("should create a policy version", func() {
-            in := versionCache.Pop("AWSHealthFullAccess")
-            out, err := service.CreatePolicyVersion(ctx, &in)
-            Expect(err).ShouldNot(HaveOccurred())
-            version := out.PolicyVersion
-            Expect(aws.ToTime(version.CreateDate).Before(time.Now().UTC()))
-            Expect(aws.ToString(version.Document)).Should(Equal(*in.PolicyDocument))
-        })
+		})
+		It("should create a policy version", func() {
+			in := versionCache.Pop("AWSHealthFullAccess")
+			out, err := service.CreatePolicyVersion(ctx, &in)
+			Expect(err).ShouldNot(HaveOccurred())
+			version := out.PolicyVersion
+			Expect(aws.ToTime(version.CreateDate).Before(time.Now().UTC()))
+			Expect(aws.ToString(version.Document)).Should(Equal(*in.PolicyDocument))
+		})
 		It("should not delete the last policy version", func() {
 			out, err := service.DeletePolicyVersion(ctx, &iam.DeletePolicyVersionInput{
 				PolicyArn: p.Arn,
@@ -96,5 +96,26 @@ var _ = Describe("Iam Policy", func() {
 			e := &iamtypes.DeleteConflictException{}
 			Expect(errors.As(err, &e)).Should(BeTrue())
 		})
-    })
+		It("should delete a policy version", func() {
+			in := versionCache.Pop("AWSHealthFullAccess")
+			in.SetAsDefault = true
+			out, err := service.CreatePolicyVersion(ctx, &in)
+			Expect(err).ShouldNot(HaveOccurred())
+			version := out.PolicyVersion
+			Expect(aws.ToTime(version.CreateDate).Before(time.Now().UTC()))
+			Expect(aws.ToString(version.Document)).Should(Equal(*in.PolicyDocument))
+
+			_, err = service.DeletePolicyVersion(ctx, &iam.DeletePolicyVersionInput{
+				PolicyArn: p.Arn,
+				VersionId: aws.String("v1"),
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = service.DeletePolicyVersion(ctx, &iam.DeletePolicyVersionInput{
+				PolicyArn: p.Arn,
+				VersionId: aws.String("v2"),
+			})
+			Expect(err).ShouldNot(Succeed())
+			Expect(err).Should(Equal(&iamtypes.DeleteConflictException{}))
+		})
+	})
 })
