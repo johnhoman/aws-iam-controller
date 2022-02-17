@@ -152,4 +152,8 @@ func (i *IamService) DeletePolicyVersion(_ context.Context, in *iam.DeletePolicy
 	return &iam.DeletePolicyVersionOutput{}, nil
 }
 
+func (i *IamService) GetPolicyVersion(context.Context, *iam.GetPolicyVersionInput, ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
+	panic("Not implemented")
+}
+
 var _ pkgaws.IamPolicyService = &IamService{}
