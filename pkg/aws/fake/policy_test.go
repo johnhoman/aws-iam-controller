@@ -117,5 +117,15 @@ var _ = Describe("Iam Policy", func() {
 			Expect(err).ShouldNot(Succeed())
 			Expect(err).Should(Equal(&iamtypes.DeleteConflictException{}))
 		})
+		It("should get a policy version", func() {
+			out, err := service.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
+				PolicyArn: p.Arn,
+				VersionId: aws.String("v1"),
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out).ShouldNot(BeNil())
+			Expect(*out.PolicyVersion.VersionId).Should(Equal("v1"))
+			Expect(out.PolicyVersion.IsDefaultVersion).Should(BeTrue())
+		})
 	})
 })

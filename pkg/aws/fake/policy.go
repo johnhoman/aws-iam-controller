@@ -152,8 +152,25 @@ func (i *IamService) DeletePolicyVersion(_ context.Context, in *iam.DeletePolicy
 	return &iam.DeletePolicyVersionOutput{}, nil
 }
 
-func (i *IamService) GetPolicyVersion(context.Context, *iam.GetPolicyVersionInput, ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
-	panic("Not implemented")
+func (i *IamService) GetPolicyVersion(_ context.Context, in *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
+	name, ok := i.policyArnMapping.Load(aws.ToString(in.PolicyArn))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	v, _ := i.ManagedPolicies.Load(name)
+	mp := v.(managedPolicy)
+	version := &iamtypes.PolicyVersion{}
+	mp.versions.Range(func(_ interface{}, v interface{}) bool {
+		if aws.ToString(v.(iamtypes.PolicyVersion).VersionId) == aws.ToString(in.VersionId) {
+			*version = v.(iamtypes.PolicyVersion)
+			return false
+		}
+		return true
+	})
+	if *version == (iamtypes.PolicyVersion{}) {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	return &iam.GetPolicyVersionOutput{PolicyVersion: version}, nil
 }
 
 var _ pkgaws.IamPolicyService = &IamService{}
