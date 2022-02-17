@@ -138,5 +138,16 @@ var _ = Describe("Iam Policy", func() {
 			Expect(errors.As(err, &er)).To(BeTrue())
 
 		})
+		It("should return no found when the policy version doesn't exist", func() {
+			out, err := service.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
+				PolicyArn: p.Arn,
+				VersionId: aws.String("v10"),
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(out).Should(BeNil())
+			er := &iamtypes.NoSuchEntityException{}
+			Expect(errors.As(err, &er)).To(BeTrue())
+
+		})
 	})
 })
