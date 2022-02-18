@@ -4,12 +4,6 @@ import (
     "context"
 )
 
-type CreateOptions struct {}
-type DeleteOptions struct {}
-type GetOptions struct {}
-type UpdateOptions struct {}
-type IamPolicy struct {}
-
 type Interface interface {
     Create(ctx context.Context, options *CreateOptions) (*IamPolicy, error)
     Update(ctx context.Context, options *UpdateOptions) (*IamPolicy, error)
