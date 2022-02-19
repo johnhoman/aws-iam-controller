@@ -152,6 +152,17 @@ func (i *IamService) DeletePolicyVersion(_ context.Context, in *iam.DeletePolicy
 	return &iam.DeletePolicyVersionOutput{}, nil
 }
 
+func (i *IamService) GetPolicy(_ context.Context, in *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
+	name, ok := i.policyArnMapping.Load(aws.ToString(in.PolicyArn))
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	v, _ := i.ManagedPolicies.Load(name)
+	mp := v.(managedPolicy)
+	policy := mp.policy
+	return &iam.GetPolicyOutput{Policy: &policy}, nil
+}
+
 func (i *IamService) GetPolicyVersion(_ context.Context, in *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
 	name, ok := i.policyArnMapping.Load(aws.ToString(in.PolicyArn))
 	if !ok {

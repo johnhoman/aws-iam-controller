@@ -78,6 +78,14 @@ var _ = Describe("Iam Policy", func() {
 			Expect(out).ToNot(BeNil())
 			p = out.Policy
 		})
+		It("can get a policy", func() {
+			out, err := service.GetPolicy(ctx, &iam.GetPolicyInput{
+				PolicyArn: p.Arn,
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(out).ShouldNot(BeNil())
+			Expect(*out.Policy.Arn).Should(Equal(*p.Arn))
+		})
 		It("should create a policy version", func() {
 			in := versionCache.Pop("AWSHealthFullAccess")
 			out, err := service.CreatePolicyVersion(ctx, &in)
