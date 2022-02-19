@@ -24,7 +24,6 @@ type UpdateOptions struct {
 
 type IamPolicy struct {
     Arn string
-    AttachmentCount int32
     CreateDate *time.Time
     Document string
     Description string
