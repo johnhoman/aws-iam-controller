@@ -4,7 +4,6 @@ import "time"
 
 type CreateOptions struct {
     Name string
-    Path string
     Document string
     Description string
 }
@@ -29,7 +28,6 @@ type IamPolicy struct {
     CreateDate *time.Time
     Document string
     Description string
-    Path string
     Name string
     Id string
 }
