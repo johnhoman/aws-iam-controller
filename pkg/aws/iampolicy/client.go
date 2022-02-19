@@ -43,7 +43,11 @@ func (c* Client) Get(ctx context.Context, options *GetOptions) (*IamPolicy, erro
 }
 
 func (c* Client) Delete(ctx context.Context, options *DeleteOptions) error {
-    panic("implement me")
+    _, err := c.service.DeletePolicy(ctx, &iam.DeletePolicyInput{PolicyArn: aws.String(options.Arn)})
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 var _ Interface = &Client{}
