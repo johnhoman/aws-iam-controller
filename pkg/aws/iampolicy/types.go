@@ -24,7 +24,7 @@ type UpdateOptions struct {
 
 type IamPolicy struct {
     Arn string
-    CreateDate *time.Time
+    CreateDate time.Time
     Document string
     Description string
     Name string
