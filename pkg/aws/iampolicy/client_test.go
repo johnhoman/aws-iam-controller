@@ -47,5 +47,13 @@ var _ = Describe("Client", func() {
 			err := client.Delete(ctx, &iampolicy.DeleteOptions{Arn: p.Arn})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
+		It("should get the policy", func() {
+			out, err := client.Get(ctx, &iampolicy.GetOptions{Arn: p.Arn})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(out.Document).Should(Equal(p.Document))
+			Expect(out.CreateDate).Should(Equal(p.CreateDate))
+			Expect(out.Id).Should(Equal(p.Id))
+			Expect(out.Description).Should(Equal(p.Description))
+		})
 	})
 })

@@ -24,6 +24,20 @@ func (c* Client) Create(ctx context.Context, options *CreateOptions) (*IamPolicy
     if err != nil {
         return nil, err
     }
+    return c.Get(ctx, &GetOptions{Arn: aws.ToString(out.Policy.Arn)})
+}
+
+func (c* Client) Update(ctx context.Context, options *UpdateOptions) (*IamPolicy, error) {
+    panic("implement me")
+}
+
+func (c* Client) Get(ctx context.Context, options *GetOptions) (*IamPolicy, error) {
+    out, err := c.service.GetPolicy(ctx, &iam.GetPolicyInput{
+        PolicyArn: aws.String(options.Arn),
+    })
+    if err != nil {
+        return nil, err
+    }
     iamPolicy := &IamPolicy{}
     iamPolicy.CreateDate = aws.ToTime(out.Policy.CreateDate)
     iamPolicy.Arn = aws.ToString(out.Policy.Arn)
@@ -32,14 +46,6 @@ func (c* Client) Create(ctx context.Context, options *CreateOptions) (*IamPolicy
     iamPolicy.Id = aws.ToString(out.Policy.PolicyId)
 
     return iamPolicy, nil
-}
-
-func (c* Client) Update(ctx context.Context, options *UpdateOptions) (*IamPolicy, error) {
-    panic("implement me")
-}
-
-func (c* Client) Get(ctx context.Context, options *GetOptions) (*IamPolicy, error) {
-    panic("implement me")
 }
 
 func (c* Client) Delete(ctx context.Context, options *DeleteOptions) error {
