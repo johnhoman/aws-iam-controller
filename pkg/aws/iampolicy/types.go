@@ -27,6 +27,9 @@ type IamPolicy struct {
     CreateDate time.Time
     Document string
     Description string
+    // VersionId the id of the default version. This client will only maintain
+    // a single version -- all others will be deleted after being updated
+    VersionId string
     Name string
     Id string
 }
