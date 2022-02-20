@@ -120,6 +120,11 @@ func (i *IamService) CreatePolicyVersion(_ context.Context, in *iam.CreatePolicy
 	}
 	out := &iam.CreatePolicyVersionOutput{}
 	out.PolicyVersion = &version
+	if version.IsDefaultVersion {
+		// Update the policy to point to the default version id
+		mp.policy.DefaultVersionId = version.VersionId
+		i.Cache.ManagedPolicies.Store(name, mp)
+	}
 	return out, nil
 }
 
