@@ -55,5 +55,29 @@ var _ = Describe("Client", func() {
 			Expect(out.Id).Should(Equal(p.Id))
 			Expect(out.Description).Should(Equal(p.Description))
 		})
+		It("should update the policy document", func() {
+			doc :=  `{"Version": "2012-10-17", "Statement": [{"Sid": "S3NoAccess"}]}`
+			updated, err := client.Update(ctx, &iampolicy.UpdateOptions{
+				Arn: p.Arn,
+				Document: doc,
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(updated).ShouldNot(BeNil())
+			out, err := client.Get(ctx, &iampolicy.GetOptions{Arn: p.Arn})
+			Expect(out.Document).Should(Equal(doc))
+			Expect(out.VersionId).ShouldNot(Equal(p.VersionId))
+		})
+		It("should not update the policy document if unchanged", func() {
+			doc :=  `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`
+			updated, err := client.Update(ctx, &iampolicy.UpdateOptions{
+				Arn: p.Arn,
+				Document: doc,
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(updated).ShouldNot(BeNil())
+			out, err := client.Get(ctx, &iampolicy.GetOptions{Arn: p.Arn})
+			Expect(out.Document).Should(Equal(doc))
+			Expect(out.VersionId).Should(Equal(p.VersionId))
+		})
 	})
 })
