@@ -7,6 +7,8 @@ type Document interface {
     Marshal() (string, error)
     Unmarshal(string) error
     AddStatement(...Statement)
+    GetStatements() []Statement
+    GetVersion() string
 }
 
 type Statement struct {
@@ -32,15 +34,27 @@ func (d* document) Marshal() (string, error) {
 }
 
 func (d* document) Unmarshal(s string) error {
-    panic("implement me")
+    raw := []byte(s)
+    if err := json.Unmarshal(raw, d); err != nil {
+        return err
+    }
+    return nil
 }
 
 func (d* document) IsEqual(d2 Document) (bool, error) {
     panic("not implemented")
 }
 
+func (d *document) GetVersion() string {
+    return d.Version
+}
+
 func (d *document) AddStatement(statements ...Statement) {
     d.Statements = append(d.Statements, statements...)
+}
+
+func (d *document) GetStatements() []Statement {
+    return d.Statements
 }
 
 func NewDocument() Document {
