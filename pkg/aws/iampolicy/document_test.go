@@ -9,25 +9,47 @@ import (
 var _ = Describe("Document", func() {
 	It("should marshal a policy document", func() {
 		doc := iampolicy.NewDocument()
-		doc.AddStatement(iampolicy.Statement{
+		doc.SetStatements([]iampolicy.Statement{{
 			Sid: "AllowS3Access",
 			Effect: "Allow",
 			Action: "s3:*",
 			Resource: "arn:aws:s3:::BUCKET-NAME",
-		})
+		}})
 		out, err := doc.Marshal()
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out).ShouldNot(BeNil())
 		Expect(out).Should(Equal(
-			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::BUCKET-NAME"}]}`,
+			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::BUCKET-NAME"]}]}`,
 		))
 	})
-	It("should unmarhsal the document document", func() {
+	It("should compare two documents", func() {
+		doc, err := iampolicy.NewDocumentFromString(
+			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::BUCKET-NAME"}]}`,
+		)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(doc).ShouldNot(BeNil())
+		doc2, err := iampolicy.NewDocumentFromString(
+			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::BUCKET-NAME"}]}`,
+		)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(doc2).ShouldNot(BeNil())
 
-		doc := iampolicy.NewDocument()
-		Expect(doc.GetStatements()).Should(HaveLen(0))
-		Expect(doc.Unmarshal(`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::BUCKET-NAME"}]}`))
-		Expect(doc.GetStatements()).Should(HaveLen(1))
-		Expect(doc.GetVersion()).Should(Equal("2012-10-17"))
+		Expect(doc2.Equals(doc)).Should(BeTrue())
+		Expect(doc.Equals(doc2)).Should(BeTrue())
+	})
+	It("should consider a resource list of length 1 to be the same as a string", func() {
+		doc, err := iampolicy.NewDocumentFromString(
+			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::BUCKET-NAME"}]}`,
+		)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(doc).ShouldNot(BeNil())
+		doc2, err := iampolicy.NewDocumentFromString(
+			`{"Version":"2012-10-17","Statement":[{"Sid":"AllowS3Access","Effect":"Allow","Action":"s3:*","Resource":["arn:aws:s3:::BUCKET-NAME"]}]}`,
+		)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(doc2).ShouldNot(BeNil())
+
+		Expect(doc2.Equals(doc)).Should(BeTrue())
+		Expect(doc.Equals(doc2)).Should(BeTrue())
 	})
 })
