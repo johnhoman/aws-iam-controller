@@ -10,9 +10,9 @@ var _ = Describe("Document", func() {
 	It("should marshal a policy document", func() {
 		doc := iampolicy.NewDocument()
 		doc.SetStatements([]iampolicy.Statement{{
-			Sid: "AllowS3Access",
-			Effect: "Allow",
-			Action: "s3:*",
+			Sid:      "AllowS3Access",
+			Effect:   "Allow",
+			Action:   "s3:*",
 			Resource: "arn:aws:s3:::BUCKET-NAME",
 		}})
 		out, err := doc.Marshal()
