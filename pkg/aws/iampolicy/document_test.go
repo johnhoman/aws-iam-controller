@@ -52,4 +52,21 @@ var _ = Describe("Document", func() {
 		Expect(doc2.Equals(doc)).Should(BeTrue())
 		Expect(doc.Equals(doc2)).Should(BeTrue())
 	})
+	It("can serialize a condition", func() {
+		doc := iampolicy.NewDocument()
+		doc.SetStatements([]iampolicy.Statement{{
+			Effect:   "Allow",
+			Action:   []string{"s3:*"},
+			Resource: []string{"arn:aws:s3:::BUCKET-NAME"},
+			Conditions: &iampolicy.Conditions{
+				StringLike: map[string][]string{
+					"ec2:InstanceType": {"t1.*", "t2.*", "m3.*"},
+				},
+			},
+		}})
+		out, err := doc.Marshal()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(out).Should(ContainSubstring(`"ec2:InstanceType":["t1.*","t2.*","m3.*"]`))
+
+	})
 })

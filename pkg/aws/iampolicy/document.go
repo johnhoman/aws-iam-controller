@@ -14,64 +14,64 @@ type Document interface {
 	Marshal() (string, error)
 }
 
-type Condition struct {
-	ArnLike                           map[string]string `json:",omitempty"`
-	ArnLikeIfExists                   map[string]string `json:",omitempty"`
-	ArnNotLike                        map[string]string `json:",omitempty"`
-	ArnNotLikeIfExists                map[string]string `json:",omitempty"`
-	BinaryEquals                      map[string]string `json:",omitempty"`
-	BinaryEqualsIfExists              map[string]string `json:",omitempty"`
-	Bool                              map[string]string `json:",omitempty"`
-	BoolIfExists                      map[string]string `json:",omitempty"`
-	DateEquals                        map[string]string `json:",omitempty"`
-	DateEqualsIfExists                map[string]string `json:",omitempty"`
-	DateNotEquals                     map[string]string `json:",omitempty"`
-	DateNotEqualsIfExists             map[string]string `json:",omitempty"`
-	DateLessThan                      map[string]string `json:",omitempty"`
-	DateLessThanIfExists              map[string]string `json:",omitempty"`
-	DateLessThanEquals                map[string]string `json:",omitempty"`
-	DateLessThanEqualsIfExists        map[string]string `json:",omitempty"`
-	DateGreaterThan                   map[string]string `json:",omitempty"`
-	DateGreaterThanIfExists           map[string]string `json:",omitempty"`
-	DateGreaterThanEquals             map[string]string `json:",omitempty"`
-	DateGreaterThanEqualsIfExists     map[string]string `json:",omitempty"`
-	IpAddress                         map[string]string `json:",omitempty"`
-	IpAddressIfExists                 map[string]string `json:",omitempty"`
-	NotIpAddress                      map[string]string `json:",omitempty"`
-	NotIpAddressIfExists              map[string]string `json:",omitempty"`
-	NumericEquals                     map[string]string `json:",omitempty"`
-	NumericEqualsIfExists             map[string]string `json:",omitempty"`
-	NumericNotEquals                  map[string]string `json:",omitempty"`
-	NumericNotEqualsIfExists          map[string]string `json:",omitempty"`
-	NumericLessThan                   map[string]string `json:",omitempty"`
-	NumericLessThanIfExists           map[string]string `json:",omitempty"`
-	NumericLessThanEquals             map[string]string `json:",omitempty"`
-	NumericLessThanEqualsIfExists     map[string]string `json:",omitempty"`
-	NumericGreaterThan                map[string]string `json:",omitempty"`
-	NumericGreaterThanIfExists        map[string]string `json:",omitempty"`
-	NumericGreaterThanEquals          map[string]string `json:",omitempty"`
-	NumericGreaterThanEqualsIfExists  map[string]string `json:",omitempty"`
-	Null                              map[string]string `json:",omitempty"`
-	StringLike                        map[string]string `json:",omitempty"`
-	StringLikeIfExists                map[string]string `json:",omitempty"`
-	StringNotLike                     map[string]string `json:",omitempty"`
-	StringNotLikeIfExists             map[string]string `json:",omitempty"`
-	StringEquals                      map[string]string `json:",omitempty"`
-	StringEqualsIfExists              map[string]string `json:",omitempty"`
-	StringNotEquals                   map[string]string `json:",omitempty"`
-	StringNotEqualsIfExists           map[string]string `json:",omitempty"`
-	StringEqualsIgnoreCase            map[string]string `json:",omitempty"`
-	StringEqualsIgnoreCaseIfExists    map[string]string `json:",omitempty"`
-	StringNotEqualsIgnoreCase         map[string]string `json:",omitempty"`
-	StringNotEqualsIgnoreCaseIfExists map[string]string `json:",omitempty"`
+type Conditions struct {
+	ArnLike                           map[string][]string `json:",omitempty"`
+	ArnLikeIfExists                   map[string][]string `json:",omitempty"`
+	ArnNotLike                        map[string][]string `json:",omitempty"`
+	ArnNotLikeIfExists                map[string][]string `json:",omitempty"`
+	BinaryEquals                      map[string][]string `json:",omitempty"`
+	BinaryEqualsIfExists              map[string][]string `json:",omitempty"`
+	Bool                              map[string][]string `json:",omitempty"`
+	BoolIfExists                      map[string][]string `json:",omitempty"`
+	DateEquals                        map[string][]string `json:",omitempty"`
+	DateEqualsIfExists                map[string][]string `json:",omitempty"`
+	DateNotEquals                     map[string][]string `json:",omitempty"`
+	DateNotEqualsIfExists             map[string][]string `json:",omitempty"`
+	DateLessThan                      map[string][]string `json:",omitempty"`
+	DateLessThanIfExists              map[string][]string `json:",omitempty"`
+	DateLessThanEquals                map[string][]string `json:",omitempty"`
+	DateLessThanEqualsIfExists        map[string][]string `json:",omitempty"`
+	DateGreaterThan                   map[string][]string `json:",omitempty"`
+	DateGreaterThanIfExists           map[string][]string `json:",omitempty"`
+	DateGreaterThanEquals             map[string][]string `json:",omitempty"`
+	DateGreaterThanEqualsIfExists     map[string][]string `json:",omitempty"`
+	IpAddress                         map[string][]string `json:",omitempty"`
+	IpAddressIfExists                 map[string][]string `json:",omitempty"`
+	NotIpAddress                      map[string][]string `json:",omitempty"`
+	NotIpAddressIfExists              map[string][]string `json:",omitempty"`
+	NumericEquals                     map[string][]string `json:",omitempty"`
+	NumericEqualsIfExists             map[string][]string `json:",omitempty"`
+	NumericNotEquals                  map[string][]string `json:",omitempty"`
+	NumericNotEqualsIfExists          map[string][]string `json:",omitempty"`
+	NumericLessThan                   map[string][]string `json:",omitempty"`
+	NumericLessThanIfExists           map[string][]string `json:",omitempty"`
+	NumericLessThanEquals             map[string][]string `json:",omitempty"`
+	NumericLessThanEqualsIfExists     map[string][]string `json:",omitempty"`
+	NumericGreaterThan                map[string][]string `json:",omitempty"`
+	NumericGreaterThanIfExists        map[string][]string `json:",omitempty"`
+	NumericGreaterThanEquals          map[string][]string `json:",omitempty"`
+	NumericGreaterThanEqualsIfExists  map[string][]string `json:",omitempty"`
+	Null                              map[string][]string `json:",omitempty"`
+	StringLike                        map[string][]string `json:",omitempty"`
+	StringLikeIfExists                map[string][]string `json:",omitempty"`
+	StringNotLike                     map[string][]string `json:",omitempty"`
+	StringNotLikeIfExists             map[string][]string `json:",omitempty"`
+	StringEquals                      map[string][]string `json:",omitempty"`
+	StringEqualsIfExists              map[string][]string `json:",omitempty"`
+	StringNotEquals                   map[string][]string `json:",omitempty"`
+	StringNotEqualsIfExists           map[string][]string `json:",omitempty"`
+	StringEqualsIgnoreCase            map[string][]string `json:",omitempty"`
+	StringEqualsIgnoreCaseIfExists    map[string][]string `json:",omitempty"`
+	StringNotEqualsIgnoreCase         map[string][]string `json:",omitempty"`
+	StringNotEqualsIgnoreCaseIfExists map[string][]string `json:",omitempty"`
 }
 
 type Statement struct {
-	Sid       string      `json:",omitempty"`
-	Effect    string      // Allow/Deny
-	Action    interface{} `json:",omitempty"` // this can also be a string
-	Resource  interface{} // this can also be a string
-	Condition *Condition  `json:",omitempty"`
+	Sid        string      `json:",omitempty"`
+	Effect     string      // Allow/Deny
+	Action     interface{} `json:",omitempty"` // this can also be a string
+	Resource   interface{} // this can also be a string
+	Conditions *Conditions `json:"Condition,omitempty"`
 }
 
 type document struct {
@@ -104,6 +104,7 @@ func (d *document) SetStatements(statements []Statement) {
 		if _, ok := statement.Resource.(string); ok {
 			statement.Resource = []interface{}{statement.Resource}
 		}
+
 		statements[k] = statement
 	}
 	d.Statements = statements
