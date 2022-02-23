@@ -18,8 +18,8 @@ var _ = Describe("Client", func() {
 	})
 	It("should create an iam policy", func() {
 		out, err := client.Create(ctx, &iampolicy.CreateOptions{
-			Name: "iam-policy",
-			Document: `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
+			Name:        "iam-policy",
+			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
 			Description: "iam test policy",
 		})
 		Expect(err).ShouldNot(HaveOccurred())
@@ -30,8 +30,8 @@ var _ = Describe("Client", func() {
 		BeforeEach(func() {
 			var err error
 			p, err = client.Create(ctx, &iampolicy.CreateOptions{
-				Name: "iam-policy",
-				Document: `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
+				Name:        "iam-policy",
+				Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
 				Description: "iam test policy",
 			})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -56,9 +56,9 @@ var _ = Describe("Client", func() {
 			Expect(out.Description).Should(Equal(p.Description))
 		})
 		It("should update the policy document", func() {
-			doc :=  `{"Version": "2012-10-17", "Statement": [{"Sid": "S3NoAccess"}]}`
+			doc := `{"Version": "2012-10-17", "Statement": [{"Sid": "S3NoAccess"}]}`
 			updated, err := client.Update(ctx, &iampolicy.UpdateOptions{
-				Arn: p.Arn,
+				Arn:      p.Arn,
 				Document: doc,
 			})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -68,9 +68,9 @@ var _ = Describe("Client", func() {
 			Expect(out.VersionId).ShouldNot(Equal(p.VersionId))
 		})
 		It("should not update the policy document if unchanged", func() {
-			doc :=  `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`
+			doc := `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`
 			updated, err := client.Update(ctx, &iampolicy.UpdateOptions{
-				Arn: p.Arn,
+				Arn:      p.Arn,
 				Document: doc,
 			})
 			Expect(err).ShouldNot(HaveOccurred())
