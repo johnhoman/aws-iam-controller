@@ -23,13 +23,83 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type Condition struct {
+	Key    string   `json:"key"`
+	Values []string `json:"values"`
+}
+
+type Conditions struct {
+	ArnLike                           []Condition `json:"arnLike,omitempty"`
+	ArnLikeIfExists                   []Condition `json:"arnLikeIfExists,omitempty"`
+	ArnNotLike                        []Condition `json:"arnNotLike,omitempty"`
+	ArnNotLikeIfExists                []Condition `json:"arnNotLikeIfExists,omitempty"`
+	BinaryEquals                      []Condition `json:"binaryEquals,omitempty"`
+	BinaryEqualsIfExists              []Condition `json:"binaryEqualsIfExists,omitempty"`
+	Bool                              []Condition `json:"bool,omitempty"`
+	BoolIfExists                      []Condition `json:"boolIfExists,omitempty"`
+	DateEquals                        []Condition `json:"dateEquals,omitempty"`
+	DateEqualsIfExists                []Condition `json:"dateEqualsIfExists,omitempty"`
+	DateNotEquals                     []Condition `json:"dateNotEquals,omitempty"`
+	DateNotEqualsIfExists             []Condition `json:"dateNotEqualsIfExists,omitempty"`
+	DateLessThan                      []Condition `json:"dateLessThan,omitempty"`
+	DateLessThanIfExists              []Condition `json:"dateLessThanIfExists,omitempty"`
+	DateLessThanEquals                []Condition `json:"dateLessThanEquals,omitempty"`
+	DateLessThanEqualsIfExists        []Condition `json:"dateLessThanEqualsIfExists,omitempty"`
+	DateGreaterThan                   []Condition `json:"dateGreaterThan,omitempty"`
+	DateGreaterThanIfExists           []Condition `json:"dateGreaterThanIfExists,omitempty"`
+	DateGreaterThanEquals             []Condition `json:"dateGreaterThanEquals,omitempty"`
+	DateGreaterThanEqualsIfExists     []Condition `json:"dateGreaterThanEqualsIfExists,omitempty"`
+	IpAddress                         []Condition `json:"ipAddress,omitempty"`
+	IpAddressIfExists                 []Condition `json:"ipAddressIfExists,omitempty"`
+	NotIpAddress                      []Condition `json:"notIpAddress,omitempty"`
+	NotIpAddressIfExists              []Condition `json:"notIpAddressIfExists,omitempty"`
+	NumericEquals                     []Condition `json:"numericEquals,omitempty"`
+	NumericEqualsIfExists             []Condition `json:"numericEqualsIfExists,omitempty"`
+	NumericNotEquals                  []Condition `json:"numericNotEquals,omitempty"`
+	NumericNotEqualsIfExists          []Condition `json:"numericNotEqualsIfExists,omitempty"`
+	NumericLessThan                   []Condition `json:"numericLessThan,omitempty"`
+	NumericLessThanIfExists           []Condition `json:"numericLessThanIfExists,omitempty"`
+	NumericLessThanEquals             []Condition `json:"numericLessThanEquals,omitempty"`
+	NumericLessThanEqualsIfExists     []Condition `json:"numericLessThanEqualsIfExists,omitempty"`
+	NumericGreaterThan                []Condition `json:"numericGreaterThan,omitempty"`
+	NumericGreaterThanIfExists        []Condition `json:"numericGreaterThanIfExists,omitempty"`
+	NumericGreaterThanEquals          []Condition `json:"numericGreaterThanEquals,omitempty"`
+	NumericGreaterThanEqualsIfExists  []Condition `json:"numericGreaterThanEqualsIfExists,omitempty"`
+	Null                              []Condition `json:"null,omitempty"`
+	StringLike                        []Condition `json:"stringLike,omitempty"`
+	StringLikeIfExists                []Condition `json:"stringLikeIfExists,omitempty"`
+	StringNotLike                     []Condition `json:"stringNotLike,omitempty"`
+	StringNotLikeIfExists             []Condition `json:"stringNotLikeIfExists,omitempty"`
+	StringEquals                      []Condition `json:"stringEquals,omitempty"`
+	StringEqualsIfExists              []Condition `json:"stringEqualsIfExists,omitempty"`
+	StringNotEquals                   []Condition `json:"stringNotEquals,omitempty"`
+	StringNotEqualsIfExists           []Condition `json:"stringNotEqualsIfExists,omitempty"`
+	StringEqualsIgnoreCase            []Condition `json:"stringEqualsIgnoreCase,omitempty"`
+	StringEqualsIgnoreCaseIfExists    []Condition `json:"stringEqualsIgnoreCaseIfExists,omitempty"`
+	StringNotEqualsIgnoreCase         []Condition `json:"stringNotEqualsIgnoreCase,omitempty"`
+	StringNotEqualsIgnoreCaseIfExists []Condition `json:"stringNotEqualsIgnoreCaseIfExists,omitempty"`
+}
+
+type Statement struct {
+	Sid        string      `json:"sid,omitempty"`
+	Effect     string      `json:"effect"`
+	Action     interface{} `json:"action,omitempty"` // this can also be a string
+	Resource   interface{} `json:"resource"`
+	Conditions *Conditions `json:"Condition,omitempty"`
+}
+
+type IamPolicyDocument struct {
+	Version    string      `json:"version,omitempty"`
+	Statements []Statement `json:"statement"`
+}
+
 // IamPolicySpec defines the desired state of IamPolicy
 type IamPolicySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of IamPolicy. Edit iampolicy_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Document IamPolicyDocument `json:"document"`
 }
 
 // IamPolicyStatus defines the observed state of IamPolicy
