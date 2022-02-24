@@ -1,0 +1,24 @@
+# permissions for end users to edit iampolicies.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: iampolicy-editor-role
+rules:
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies/status
+  verbs:
+  - get

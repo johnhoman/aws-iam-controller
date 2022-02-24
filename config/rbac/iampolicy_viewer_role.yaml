@@ -1,0 +1,20 @@
+# permissions for end users to view iampolicies.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: iampolicy-viewer-role
+rules:
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies/status
+  verbs:
+  - get

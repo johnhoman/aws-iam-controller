@@ -19,14 +19,16 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
-	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
-	"go.uber.org/zap/zapcore"
-	"k8s.io/apimachinery/pkg/util/json"
 	"os"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/util/json"
+
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -161,6 +163,13 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "IamRoleBinding")
 			os.Exit(1)
 		}
+	}
+	if err = (&controllers.IamPolicyReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "IamPolicy")
+		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 

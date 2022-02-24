@@ -1,0 +1,6 @@
+apiVersion: aws.jackhoman.com/v1alpha1
+kind: IamPolicy
+metadata:
+  name: iampolicy-sample
+spec:
+  # TODO(user): Add fields here

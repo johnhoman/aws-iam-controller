@@ -9,6 +9,32 @@ rules:
 - apiGroups:
   - aws.jackhoman.com
   resources:
+  - iampolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
+  - iampolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - aws.jackhoman.com
+  resources:
   - iamrolebindings
   verbs:
   - create
