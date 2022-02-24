@@ -98,7 +98,7 @@ type IamPolicySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of IamPolicy. Edit iampolicy_types.go to remove/update
+	// Document - Iam policy document
 	Document IamPolicyDocument `json:"document"`
 }
 
