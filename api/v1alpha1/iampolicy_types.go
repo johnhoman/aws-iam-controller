@@ -83,8 +83,8 @@ type Conditions struct {
 type Statement struct {
 	Sid        string      `json:"sid,omitempty"`
 	Effect     string      `json:"effect"`
-	Action     interface{} `json:"action,omitempty"` // this can also be a string
-	Resource   interface{} `json:"resource"`
+	Actions    []string    `json:"action,omitempty"` // this can also be a string
+	Resources  []string    `json:"resource"`
 	Conditions *Conditions `json:"Condition,omitempty"`
 }
 

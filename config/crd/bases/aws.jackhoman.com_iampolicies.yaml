@@ -36,10 +36,720 @@ spec:
           spec:
             description: IamPolicySpec defines the desired state of IamPolicy
             properties:
-              foo:
+              document:
                 description: Foo is an example field of IamPolicy. Edit iampolicy_types.go
                   to remove/update
-                type: string
+                properties:
+                  statement:
+                    items:
+                      properties:
+                        Condition:
+                          properties:
+                            arnLike:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            arnLikeIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            arnNotLike:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            arnNotLikeIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            binaryEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            binaryEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            bool:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            boolIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateGreaterThan:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateGreaterThanEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateGreaterThanEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateGreaterThanIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateLessThan:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateLessThanEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateLessThanEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateLessThanIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateNotEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            dateNotEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            ipAddress:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            ipAddressIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            notIpAddress:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            notIpAddressIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            "null":
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericGreaterThan:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericGreaterThanEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericGreaterThanEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericGreaterThanIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericLessThan:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericLessThanEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericLessThanEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericLessThanIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericNotEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            numericNotEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringEqualsIgnoreCase:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringEqualsIgnoreCaseIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringLike:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringLikeIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotEquals:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotEqualsIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotEqualsIgnoreCase:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotEqualsIgnoreCaseIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotLike:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                            stringNotLikeIfExists:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - values
+                                type: object
+                              type: array
+                          type: object
+                        action: {}
+                        effect:
+                          type: string
+                        resource: {}
+                        sid:
+                          type: string
+                      required:
+                      - effect
+                      - resource
+                      type: object
+                    type: array
+                  version:
+                    type: string
+                required:
+                - statement
+                type: object
+            required:
+            - document
             type: object
           status:
             description: IamPolicyStatus defines the observed state of IamPolicy
