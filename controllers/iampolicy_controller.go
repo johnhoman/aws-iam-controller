@@ -18,20 +18,31 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 )
 
 // IamPolicyReconciler reconciles a IamPolicy object
 type IamPolicyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	record.EventRecorder
+
+	AWS iampolicy.Interface
 }
+
+const (
+	IamPolicyFinalizer = "aws.jackhoman.com/delete-iam-policy"
+)
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies/status,verbs=get;update;patch
@@ -39,17 +50,45 @@ type IamPolicyReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the IamPolicy object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	instance := &awsv1alpha1.IamPolicy{}
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
+		logger.Info("unable to get instance")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !instance.GetDeletionTimestamp().IsZero() {
+		if controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
+			// Remove the Iam Policy
+			// - Check the status for an ARN
+
+			patch := client.MergeFrom(instance)
+			controllerutil.RemoveFinalizer(instance, IamPolicyFinalizer)
+			if err := r.Client.Patch(ctx, instance, patch); err != nil {
+				logger.Error(err, "unable to remove finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
+		patch := &unstructured.Unstructured{Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"finalizers": []string{IamPolicyFinalizer},
+			},
+		}}
+		patch.SetName(instance.GetName())
+		patch.SetGroupVersionKind(instance.GroupVersionKind())
+		if err := r.Client.Patch(ctx, patch, client.Apply, client.FieldOwner("aws-iam-policy-controller")); err != nil {
+			logger.Error(err, "unable to patch finalizer", "finalizer", IamPolicyFinalizer)
+			logger.Info("finalizer not added")
+			return ctrl.Result{}, err
+		}
+		logger.Info("added finalizer", "finalizer", IamPolicyFinalizer)
+	}
 
 	return ctrl.Result{}, nil
 }
