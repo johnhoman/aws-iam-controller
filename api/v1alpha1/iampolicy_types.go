@@ -104,12 +104,13 @@ type IamPolicySpec struct {
 
 // IamPolicyStatus defines the observed state of IamPolicy
 type IamPolicyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Md5Sum string `json:"md5,omitempty"`
+	Arn    string `json:"arn,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:scope=Cluster
 
 // IamPolicy is the Schema for the iampolicies API
 type IamPolicy struct {

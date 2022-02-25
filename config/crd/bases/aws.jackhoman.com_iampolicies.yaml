@@ -14,7 +14,7 @@ spec:
     listKind: IamPolicyList
     plural: iampolicies
     singular: iampolicy
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
@@ -37,8 +37,7 @@ spec:
             description: IamPolicySpec defines the desired state of IamPolicy
             properties:
               document:
-                description: Foo is an example field of IamPolicy. Edit iampolicy_types.go
-                  to remove/update
+                description: Document - Iam policy document
                 properties:
                   statement:
                     items:
@@ -732,10 +731,16 @@ spec:
                                 type: object
                               type: array
                           type: object
-                        action: {}
+                        action:
+                          items:
+                            type: string
+                          type: array
                         effect:
                           type: string
-                        resource: {}
+                        resource:
+                          items:
+                            type: string
+                          type: array
                         sid:
                           type: string
                       required:
@@ -753,6 +758,11 @@ spec:
             type: object
           status:
             description: IamPolicyStatus defines the observed state of IamPolicy
+            properties:
+              arn:
+                type: string
+              md5:
+                type: string
             type: object
         type: object
     served: true
