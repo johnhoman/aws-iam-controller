@@ -22,8 +22,8 @@ import (
 
 
 const (
-	PolicyEffectAllow = "Allow"
-	PolicyEffectDeny = "Deny"
+	PolicyStatementEffectAllow = "Allow"
+	PolicyStatementEffectDeny = "Deny"
 )
 
 type Condition struct {
