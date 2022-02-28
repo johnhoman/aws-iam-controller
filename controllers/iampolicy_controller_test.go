@@ -80,9 +80,11 @@ var _ = Describe("IamPolicyController", func() {
 				it.Expect().Delete(instance).Should(Succeed())
 			})
 			It("removes the finalizer", func() {
-				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(o client.Object) bool {
+				policy := &awsv1alpha1.IamPolicy{}
+				it.Eventually().GetWhen(key, policy, func(o client.Object) bool {
 					return !controllerutil.ContainsFinalizer(o, IamPolicyFinalizer)
 				}).Should(Succeed())
+				Expect(policy.GetFinalizers()).Should(ContainElement("keep-alive"))
 			})
 		})
 	})
