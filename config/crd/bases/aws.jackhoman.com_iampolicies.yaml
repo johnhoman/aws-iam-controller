@@ -736,6 +736,9 @@ spec:
                             type: string
                           type: array
                         effect:
+                          enum:
+                          - Allow
+                          - Deny
                           type: string
                         resource:
                           items:
