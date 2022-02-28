@@ -20,8 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	PolicyEffectAllow = "Allow"
+	PolicyEffectDeny = "Deny"
+)
 
 type Condition struct {
 	Key    string   `json:"key"`
@@ -82,6 +85,7 @@ type Conditions struct {
 
 type Statement struct {
 	Sid        string      `json:"sid,omitempty"`
+	// +kubebuilder:validation:Enum=Allow;Deny
 	Effect     string      `json:"effect"`
 	Actions    []string    `json:"action,omitempty"` // this can also be a string
 	Resources  []string    `json:"resource"`
@@ -95,9 +99,6 @@ type IamPolicyDocument struct {
 
 // IamPolicySpec defines the desired state of IamPolicy
 type IamPolicySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Document - Iam policy document
 	Document IamPolicyDocument `json:"document"`
 }
