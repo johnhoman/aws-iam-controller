@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 package controllers
 
 import (
@@ -73,8 +72,18 @@ var _ = Describe("IamPolicyController", func() {
 		It("should have a finalizer", func() {
 			policy := &awsv1alpha1.IamPolicy{}
 			it.Eventually().GetWhen(key, policy, func(o client.Object) bool {
-				return controllerutil.ContainsFinalizer(policy, IamPolicyFinalizer)
+				return controllerutil.ContainsFinalizer(o, IamPolicyFinalizer)
 			}).Should(Succeed())
+		})
+		When("the iam policy is marked for deletion", func() {
+			BeforeEach(func() {
+				it.Expect().Delete(instance).Should(Succeed())
+			})
+			It("removes the finalizer", func() {
+				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(o client.Object) bool {
+					return !controllerutil.ContainsFinalizer(o, IamPolicyFinalizer)
+				}).Should(Succeed())
+			})
 		})
 	})
 })
