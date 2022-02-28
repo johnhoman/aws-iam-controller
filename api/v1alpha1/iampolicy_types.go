@@ -20,10 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 const (
 	PolicyStatementEffectAllow = "Allow"
-	PolicyStatementEffectDeny = "Deny"
+	PolicyStatementEffectDeny  = "Deny"
 )
 
 type Condition struct {
@@ -84,7 +83,7 @@ type Conditions struct {
 }
 
 type Statement struct {
-	Sid        string      `json:"sid,omitempty"`
+	Sid string `json:"sid,omitempty"`
 	// +kubebuilder:validation:Enum=Allow;Deny
 	Effect     string      `json:"effect"`
 	Actions    []string    `json:"action,omitempty"` // this can also be a string
