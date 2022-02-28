@@ -63,7 +63,7 @@ var _ = Describe("IamPolicyController", func() {
 			instance.SetFinalizers([]string{"keep-alive"})
 			instance.Spec.Document = awsv1alpha1.IamPolicyDocument{
 				Statements: []awsv1alpha1.Statement{{
-					Effect:    "Allow",
+					Effect:    awsv1alpha1.PolicyStatementEffectAllow,
 					Actions:   []string{"s3:ListBucket", "s3:CreateBucket", "s3:DeleteBucket"},
 					Resources: []string{"*"},
 				}},
