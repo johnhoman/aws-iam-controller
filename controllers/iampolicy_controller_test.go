@@ -23,13 +23,12 @@ import (
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 	"github.com/johnhoman/controller-tools/manager"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("IamPolicyController", func() {
@@ -76,7 +75,29 @@ var _ = Describe("IamPolicyController", func() {
 			}).Should(Succeed())
 		})
 		When("the iam policy is marked for deletion", func() {
+			var upstream *iampolicy.IamPolicy
 			BeforeEach(func() {
+				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {
+					return controllerutil.ContainsFinalizer(obj, IamPolicyFinalizer)
+				}).Should(Succeed())
+				// setup for upstream resource deletion test
+				var err error
+				upstream, err = service.Create(it.GetContext(), &iampolicy.CreateOptions{
+					Name:        key.Name,
+					Document:    "{}",
+					Description: "should be deleted",
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(upstream).ShouldNot(BeNil())
+				in := &awsv1alpha1.IamPolicy{}
+				it.Eventually().Get(key, in).Should(Succeed())
+				in.Status.Arn = upstream.Arn
+				err = it.Uncached().Status().Update(it.GetContext(), in)
+				Expect(err).ShouldNot(HaveOccurred())
+				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamPolicy).Status.Arn) > 0
+				}).Should(Succeed())
+
 				it.Expect().Delete(instance).Should(Succeed())
 			})
 			It("should remove the finalizer", func() {
@@ -85,6 +106,14 @@ var _ = Describe("IamPolicyController", func() {
 					return !controllerutil.ContainsFinalizer(o, IamPolicyFinalizer)
 				}).Should(Succeed())
 				Expect(policy.GetFinalizers()).Should(ContainElement("keep-alive"))
+			})
+			It("deletes the resource", func() {
+				Eventually(func() error {
+					_, err := service.Get(it.GetContext(), &iampolicy.GetOptions{
+						Arn: upstream.Arn,
+					})
+					return err
+				}).Should(HaveOccurred())
 			})
 		})
 	})

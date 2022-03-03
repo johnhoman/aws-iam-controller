@@ -63,13 +63,23 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
 			// Remove the Iam Policy
 			// - Check the status for an ARN
+			if len(instance.Status.Arn) != 0 {
+				if err := r.AWS.Delete(ctx, &iampolicy.DeleteOptions{Arn: instance.Status.Arn}); err != nil {
+					logger.Error(err, "unable to delete iam policy", "arn", instance.Status.Arn)
+					return ctrl.Result{}, err
+				}
+				logger.Info("deleted resource", "arn", instance.Status.Arn)
+			} else {
+				logger.Info("arn not found in status")
+			}
 
-			patch := client.MergeFrom(instance)
+			patch := client.MergeFrom(instance.DeepCopy())
 			controllerutil.RemoveFinalizer(instance, IamPolicyFinalizer)
 			if err := r.Client.Patch(ctx, instance, patch); err != nil {
 				logger.Error(err, "unable to remove finalizer")
 				return ctrl.Result{}, err
 			}
+			logger.Info("removed finalizer")
 		}
 		return ctrl.Result{}, nil
 	}
