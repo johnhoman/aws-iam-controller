@@ -19,18 +19,21 @@ package iampolicy
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"k8s.io/apimachinery/pkg/util/json"
 	"net/url"
 	"reflect"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/hashicorp/golang-lru"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 type Client struct {
-	service pkgaws.IamPolicyService
-	path    string
+	service   pkgaws.IamPolicyService
+	path      string
+	nameCache *lru.Cache
 }
 
 func (c *Client) Create(ctx context.Context, options *CreateOptions) (*IamPolicy, error) {
@@ -89,7 +92,42 @@ func (c *Client) Update(ctx context.Context, options *UpdateOptions) (*IamPolicy
 	return c.Get(ctx, &GetOptions{Arn: policy.Arn})
 }
 
+func (c *Client) findArn(ctx context.Context, options *GetOptions) (string, error) {
+	arn, ok := c.nameCache.Get(options.Name)
+	if ok {
+		return arn.(string), nil
+	}
+	out, err := c.service.ListPolicies(ctx, &iam.ListPoliciesInput{
+		PathPrefix: aws.String(c.path),
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, policy := range out.Policies {
+		if aws.ToString(policy.PolicyName) == options.Name {
+			arn := aws.ToString(policy.Arn)
+			c.nameCache.Add(options.Name, arn)
+			return arn, nil
+		}
+	}
+	return "", nil
+}
+
 func (c *Client) Get(ctx context.Context, options *GetOptions) (*IamPolicy, error) {
+
+	if len(options.Name) > 0 {
+		// find the ARN
+		arn, err := c.findArn(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		if len(arn) == 0 {
+			// Not found
+			return nil, &iamtypes.NoSuchEntityException{}
+		}
+		options = &GetOptions{Arn: arn}
+	}
+
 	out, err := c.service.GetPolicy(ctx, &iam.GetPolicyInput{
 		PolicyArn: aws.String(options.Arn),
 	})
@@ -133,8 +171,10 @@ func (c *Client) Delete(ctx context.Context, options *DeleteOptions) error {
 var _ Interface = &Client{}
 
 func New(service pkgaws.IamPolicyService, path string) *Client {
+	cache, _ := lru.New(128)
 	return &Client{
-		service: service,
-		path:    fmt.Sprintf("/%s/", path),
+		service:   service,
+		path:      fmt.Sprintf("/%s/", path),
+		nameCache: cache,
 	}
 }

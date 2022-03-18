@@ -9,6 +9,7 @@ require (
 	github.com/aws/smithy-go v1.10.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/google/uuid v1.1.2
+	github.com/hashicorp/golang-lru v0.5.1
 	github.com/johnhoman/controller-tools v0.0.0-20220130205403-48b6692ecfd3
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0

@@ -28,6 +28,7 @@ type IamPolicyService interface {
 	DeletePolicyVersion(context.Context, *iam.DeletePolicyVersionInput, ...func(*iam.Options)) (*iam.DeletePolicyVersionOutput, error)
 	GetPolicy(context.Context, *iam.GetPolicyInput, ...func(*iam.Options)) (*iam.GetPolicyOutput, error)
 	GetPolicyVersion(context.Context, *iam.GetPolicyVersionInput, ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error)
+	ListPolicies(context.Context, *iam.ListPoliciesInput, ...func(options *iam.Options)) (*iam.ListPoliciesOutput, error)
 }
 
 type IamRoleService interface {

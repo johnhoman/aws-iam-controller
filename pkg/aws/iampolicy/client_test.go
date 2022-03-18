@@ -71,6 +71,14 @@ var _ = Describe("Client", func() {
 			Expect(out.Id).Should(Equal(p.Id))
 			Expect(out.Description).Should(Equal(p.Description))
 		})
+		It("should get the policy by name", func() {
+			out, err := client.Get(ctx, &iampolicy.GetOptions{Name: "iam-policy"})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(out.Document).Should(Equal(p.Document))
+			Expect(out.CreateDate).Should(Equal(p.CreateDate))
+			Expect(out.Id).Should(Equal(p.Id))
+			Expect(out.Description).Should(Equal(p.Description))
+		})
 		It("should update the policy document", func() {
 			doc := `{"Version": "2012-10-17", "Statement": [{"Sid": "S3NoAccess"}]}`
 			updated, err := client.Update(ctx, &iampolicy.UpdateOptions{
