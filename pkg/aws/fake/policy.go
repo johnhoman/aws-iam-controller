@@ -31,6 +31,21 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
+func (i *IamService) ListPolicies(_ context.Context, params *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
+	if params == nil {
+		params = &iam.ListPoliciesInput{}
+	}
+
+	policies := make([]iamtypes.Policy, 0, 10)
+	i.ManagedPolicies.Range(func(k interface{}, v interface{}) bool {
+		mp := v.(managedPolicy)
+		policies = append(policies, mp.policy)
+		return true
+	})
+
+	return &iam.ListPoliciesOutput{Policies: policies}, nil
+}
+
 func (i *IamService) CreatePolicy(_ context.Context, p *iam.CreatePolicyInput, _ ...func(*iam.Options)) (*iam.CreatePolicyOutput, error) {
 
 	if _, ok := i.ManagedPolicies.Load(aws.ToString(p.PolicyName)); ok {

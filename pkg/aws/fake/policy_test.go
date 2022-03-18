@@ -69,6 +69,16 @@ var _ = Describe("Iam Policy", func() {
 		Expect(errors.As(err, &er)).Should(BeTrue())
 		Expect(out).Should(BeNil())
 	})
+	It("should list policies", func() {
+		in := inputCache.Pop("AWSHealthFullAccess")
+		createOut, err := service.CreatePolicy(ctx, in)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(createOut).ToNot(BeNil())
+
+		out, err := service.ListPolicies(ctx, nil)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(out.Policies).Should(HaveLen(1))
+	})
 	When("the policy exists", func() {
 		var p *iamtypes.Policy
 		BeforeEach(func() {
