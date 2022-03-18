@@ -79,6 +79,23 @@ var _ = Describe("Iam Policy", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out.Policies).Should(HaveLen(1))
 	})
+	It("should list policies on a specific path", func() {
+		in := inputCache.Pop("AWSHealthFullAccess")
+		createOut, err := service.CreatePolicy(ctx, in)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(createOut).ToNot(BeNil())
+
+		in = inputCache.Pop("ClientVPNServiceRolePolicy")
+		createOut, err = service.CreatePolicy(ctx, in)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(createOut).ToNot(BeNil())
+
+		out, err := service.ListPolicies(ctx, &iam.ListPoliciesInput{
+			PathPrefix: aws.String("/aws-service-role/"),
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(out.Policies).Should(HaveLen(1))
+	})
 	When("the policy exists", func() {
 		var p *iamtypes.Policy
 		BeforeEach(func() {

@@ -39,7 +39,9 @@ func (i *IamService) ListPolicies(_ context.Context, params *iam.ListPoliciesInp
 	policies := make([]iamtypes.Policy, 0, 10)
 	i.ManagedPolicies.Range(func(k interface{}, v interface{}) bool {
 		mp := v.(managedPolicy)
-		policies = append(policies, mp.policy)
+		if params.PathPrefix == nil || aws.ToString(mp.policy.Path) == aws.ToString(params.PathPrefix) {
+			policies = append(policies, mp.policy)
+		}
 		return true
 	})
 
