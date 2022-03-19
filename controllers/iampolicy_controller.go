@@ -182,18 +182,82 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+func toMap(conditions []awsv1alpha1.Condition) map[string][]string {
+
+	m := map[string][]string{}
+	for _, condition := range conditions {
+		m[condition.Key] = condition.Values
+	}
+	return m
+}
+
 func serializeDocument(instance *awsv1alpha1.IamPolicy) (string, error) {
 	// Create it
 	doc := iampolicy.NewDocument()
 	// TODO: use version
 	statements := make([]iampolicy.Statement, 0, len(instance.Spec.Document.Statements))
 	for _, statement := range instance.Spec.Document.Statements {
+		var conditions *iampolicy.Conditions
+		if statement.Conditions != nil {
+			conditions = &iampolicy.Conditions{
+				ArnLike:                           toMap(statement.Conditions.ArnLike),
+				ArnLikeIfExists:                   toMap(statement.Conditions.ArnLikeIfExists),
+				ArnNotLike:                        toMap(statement.Conditions.ArnNotLike),
+				ArnNotLikeIfExists:                toMap(statement.Conditions.ArnNotLikeIfExists),
+				BinaryEquals:                      toMap(statement.Conditions.BinaryEquals),
+				BinaryEqualsIfExists:              toMap(statement.Conditions.BinaryEqualsIfExists),
+				Bool:                              toMap(statement.Conditions.Bool),
+				BoolIfExists:                      toMap(statement.Conditions.BoolIfExists),
+				DateEquals:                        toMap(statement.Conditions.DateEquals),
+				DateEqualsIfExists:                toMap(statement.Conditions.DateEqualsIfExists),
+				DateNotEquals:                     toMap(statement.Conditions.DateNotEquals),
+				DateNotEqualsIfExists:             toMap(statement.Conditions.DateNotEqualsIfExists),
+				DateLessThan:                      toMap(statement.Conditions.DateLessThan),
+				DateLessThanIfExists:              toMap(statement.Conditions.DateLessThanIfExists),
+				DateLessThanEquals:                toMap(statement.Conditions.DateLessThanEquals),
+				DateLessThanEqualsIfExists:        toMap(statement.Conditions.DateLessThanEqualsIfExists),
+				DateGreaterThan:                   toMap(statement.Conditions.DateGreaterThan),
+				DateGreaterThanIfExists:           toMap(statement.Conditions.DateGreaterThanIfExists),
+				DateGreaterThanEquals:             toMap(statement.Conditions.DateGreaterThanEquals),
+				DateGreaterThanEqualsIfExists:     toMap(statement.Conditions.DateGreaterThanEqualsIfExists),
+				IpAddress:                         toMap(statement.Conditions.IpAddress),
+				IpAddressIfExists:                 toMap(statement.Conditions.IpAddressIfExists),
+				NotIpAddress:                      toMap(statement.Conditions.NotIpAddress),
+				NotIpAddressIfExists:              toMap(statement.Conditions.NotIpAddressIfExists),
+				NumericEquals:                     toMap(statement.Conditions.NumericEquals),
+				NumericEqualsIfExists:             toMap(statement.Conditions.NumericEqualsIfExists),
+				NumericNotEquals:                  toMap(statement.Conditions.NumericNotEquals),
+				NumericNotEqualsIfExists:          toMap(statement.Conditions.NumericNotEqualsIfExists),
+				NumericLessThan:                   toMap(statement.Conditions.NumericLessThan),
+				NumericLessThanIfExists:           toMap(statement.Conditions.NumericLessThanIfExists),
+				NumericLessThanEquals:             toMap(statement.Conditions.NumericLessThanEquals),
+				NumericLessThanEqualsIfExists:     toMap(statement.Conditions.NumericLessThanEqualsIfExists),
+				NumericGreaterThan:                toMap(statement.Conditions.NumericGreaterThan),
+				NumericGreaterThanIfExists:        toMap(statement.Conditions.NumericGreaterThanIfExists),
+				NumericGreaterThanEquals:          toMap(statement.Conditions.NumericGreaterThanEquals),
+				NumericGreaterThanEqualsIfExists:  toMap(statement.Conditions.NumericGreaterThanEqualsIfExists),
+				Null:                              toMap(statement.Conditions.Null),
+				StringLike:                        toMap(statement.Conditions.StringLike),
+				StringLikeIfExists:                toMap(statement.Conditions.StringLikeIfExists),
+				StringNotLike:                     toMap(statement.Conditions.StringNotLike),
+				StringNotLikeIfExists:             toMap(statement.Conditions.StringNotLikeIfExists),
+				StringEquals:                      toMap(statement.Conditions.StringEquals),
+				StringEqualsIfExists:              toMap(statement.Conditions.StringEqualsIfExists),
+				StringNotEquals:                   toMap(statement.Conditions.StringNotEquals),
+				StringNotEqualsIfExists:           toMap(statement.Conditions.StringNotEqualsIfExists),
+				StringEqualsIgnoreCase:            toMap(statement.Conditions.StringEqualsIgnoreCase),
+				StringEqualsIgnoreCaseIfExists:    toMap(statement.Conditions.StringEqualsIgnoreCaseIfExists),
+				StringNotEqualsIgnoreCase:         toMap(statement.Conditions.StringNotEqualsIgnoreCase),
+				StringNotEqualsIgnoreCaseIfExists: toMap(statement.Conditions.StringNotEqualsIgnoreCaseIfExists),
+			}
+		}
+
 		statements = append(statements, iampolicy.Statement{
-			Sid:      statement.Sid,
-			Effect:   statement.Effect,
-			Action:   statement.Actions,
-			Resource: statement.Resources,
-			// TODO: Conditions
+			Sid:        statement.Sid,
+			Effect:     statement.Effect,
+			Action:     statement.Actions,
+			Resource:   statement.Resources,
+			Conditions: conditions,
 		})
 	}
 	doc.SetStatements(statements)

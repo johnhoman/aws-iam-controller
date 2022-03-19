@@ -81,6 +81,25 @@ var _ = Describe("IamPolicyController", func() {
 			}).Should(Succeed())
 			Expect(policy.Status.Md5Sum).ShouldNot(Equal(""))
 		})
+		It("should convert the conditionals", func() {
+			policy := &awsv1alpha1.IamPolicy{}
+			it.Eventually().GetWhen(key, policy, func(obj client.Object) bool {
+				return len(obj.(*awsv1alpha1.IamPolicy).Status.Arn) > 0
+			}).Should(Succeed())
+			sum := policy.Status.Md5Sum
+			Expect(sum).ShouldNot(Equal(""))
+			patch := client.MergeFrom(policy.DeepCopy())
+			policy.Spec.Document.Statements[0].Conditions = &awsv1alpha1.Conditions{
+				ArnLike: []awsv1alpha1.Condition{{
+					Key:    "aws:SourceArn",
+					Values: []string{"arn:aws:iam::0123456789012:role/iam-user"},
+				}},
+			}
+			Expect(it.Uncached().Patch(it.GetContext(), policy, patch)).Should(Succeed())
+			it.Eventually().GetWhen(key, policy, func(obj client.Object) bool {
+				return obj.(*awsv1alpha1.IamPolicy).Status.Md5Sum != sum
+			}).Should(Succeed())
+		})
 		When("the iam policy is marked for deletion", func() {
 			var upstream *iampolicy.IamPolicy
 			BeforeEach(func() {
