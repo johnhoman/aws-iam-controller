@@ -82,6 +82,10 @@ var _ = Describe("Document", func() {
 		out, err := doc.Marshal()
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out).Should(ContainSubstring(`"ec2:InstanceType":["t1.*","t2.*","m3.*"]`))
-
+	})
+	It("can set the version", func() {
+		doc := iampolicy.NewDocument()
+		doc.SetVersion("2021-12-10")
+		Expect(doc.GetVersion()).Should(Equal("2021-12-10"))
 	})
 })

@@ -25,8 +25,8 @@ type Document interface {
 	Equals(Document) (bool, error)
 	SetStatements([]Statement)
 	GetStatements() []Statement
+	SetVersion(string)
 	GetVersion() string
-
 	Marshal() (string, error)
 }
 
@@ -109,6 +109,10 @@ func (d *document) Equals(d2 Document) (bool, error) {
 
 func (d *document) GetVersion() string {
 	return d.Version
+}
+
+func (d *document) SetVersion(s string) {
+	d.Version = s
 }
 
 func (d *document) SetStatements(statements []Statement) {
