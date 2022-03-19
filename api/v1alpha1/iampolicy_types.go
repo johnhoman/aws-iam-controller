@@ -99,7 +99,8 @@ type IamPolicyDocument struct {
 // IamPolicySpec defines the desired state of IamPolicy
 type IamPolicySpec struct {
 	// Document - Iam policy document
-	Document IamPolicyDocument `json:"document"`
+	Description string            `json:"description,omitempty"`
+	Document    IamPolicyDocument `json:"document"`
 }
 
 // IamPolicyStatus defines the observed state of IamPolicy
