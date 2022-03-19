@@ -36,8 +36,10 @@ spec:
           spec:
             description: IamPolicySpec defines the desired state of IamPolicy
             properties:
-              document:
+              description:
                 description: Document - Iam policy document
+                type: string
+              document:
                 properties:
                   statement:
                     items:
