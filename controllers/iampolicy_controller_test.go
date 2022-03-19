@@ -74,6 +74,13 @@ var _ = Describe("IamPolicyController", func() {
 				return controllerutil.ContainsFinalizer(o, IamPolicyFinalizer)
 			}).Should(Succeed())
 		})
+		It("should update the status", func() {
+			policy := &awsv1alpha1.IamPolicy{}
+			it.Eventually().GetWhen(key, policy, func(obj client.Object) bool {
+				return len(obj.(*awsv1alpha1.IamPolicy).Status.Arn) > 0
+			}).Should(Succeed())
+			Expect(policy.Status.Md5Sum).ShouldNot(Equal(""))
+		})
 		When("the iam policy is marked for deletion", func() {
 			var upstream *iampolicy.IamPolicy
 			BeforeEach(func() {
@@ -81,23 +88,16 @@ var _ = Describe("IamPolicyController", func() {
 					return controllerutil.ContainsFinalizer(obj, IamPolicyFinalizer)
 				}).Should(Succeed())
 				// setup for upstream resource deletion test
-				var err error
-				upstream, err = service.Create(it.GetContext(), &iampolicy.CreateOptions{
-					Name:        key.Name,
-					Document:    "{}",
-					Description: "should be deleted",
-				})
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(upstream).ShouldNot(BeNil())
-				in := &awsv1alpha1.IamPolicy{}
-				it.Eventually().Get(key, in).Should(Succeed())
-				in.Status.Arn = upstream.Arn
-				err = it.Uncached().Status().Update(it.GetContext(), in)
-				Expect(err).ShouldNot(HaveOccurred())
-				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {
+				policy := &awsv1alpha1.IamPolicy{}
+				it.Eventually().GetWhen(key, policy, func(obj client.Object) bool {
 					return len(obj.(*awsv1alpha1.IamPolicy).Status.Arn) > 0
 				}).Should(Succeed())
-
+				var err error
+				upstream, err = service.Get(it.GetContext(), &iampolicy.GetOptions{Arn: policy.Status.Arn})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(upstream).ShouldNot(BeNil())
+			})
+			JustBeforeEach(func() {
 				it.Expect().Delete(instance).Should(Succeed())
 			})
 			It("should remove the finalizer", func() {

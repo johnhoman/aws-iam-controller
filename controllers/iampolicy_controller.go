@@ -18,17 +18,20 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"crypto/md5"
+	"fmt"
 
+	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 )
 
 // IamPolicyReconciler reconciles a IamPolicy object
@@ -41,7 +44,8 @@ type IamPolicyReconciler struct {
 }
 
 const (
-	IamPolicyFinalizer = "aws.jackhoman.com/delete-iam-policy"
+	IamPolicyFinalizer  = "aws.jackhoman.com/delete-iam-policy"
+	IamPolicyFieldOwner = client.FieldOwner("policy.iam.aws.controller")
 )
 
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies,verbs=get;list;watch;create;update;patch;delete
@@ -99,6 +103,65 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		logger.Info("added finalizer", "finalizer", IamPolicyFinalizer)
 	}
+	// Create the iam policy
+	options := &iampolicy.GetOptions{Name: instance.GetName()}
+	if len(instance.Status.Arn) > 0 {
+		// Use the arn if it's available. Most of the time it should be.
+		// Using the name to get the arn will be a more expensive operation
+		*options = iampolicy.GetOptions{Arn: instance.Status.Arn}
+	}
+	document, err := serializeDocument(instance)
+	iamPolicy, err := r.AWS.Get(ctx, options)
+	sum := md5Sum(document)
+	if err != nil {
+		if !aws.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		// Create it
+		iamPolicy, err = r.AWS.Create(ctx, &iampolicy.CreateOptions{
+			Name:        instance.GetName(),
+			Document:    document,
+			Description: instance.Spec.Description,
+		})
+		if err != nil {
+			logger.Error(err, "unable to create iam policy")
+			return ctrl.Result{}, err
+		}
+		patch := &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"arn": iamPolicy.Arn,
+				"md5": sum,
+			},
+		}}
+		patch.SetGroupVersionKind(instance.GroupVersionKind())
+		patch.SetName(instance.GetName())
+		if err := r.Client.Status().Patch(ctx, patch, client.Apply, IamPolicyFieldOwner, client.ForceOwnership); err != nil {
+			logger.Error(err, "unable to patch status on create")
+		}
+		r.Eventf(instance, corev1.EventTypeNormal, "Created", "Created iam policy %s", iamPolicy.Arn)
+	}
+	if sum != instance.Status.Md5Sum {
+		iamPolicy, err = r.AWS.Update(ctx, &iampolicy.UpdateOptions{
+			Arn:      iamPolicy.Arn,
+			Document: document,
+		})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		patch := &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"arn": iamPolicy.Arn,
+				"md5": sum,
+			},
+		}}
+		patch.SetGroupVersionKind(instance.GroupVersionKind())
+		patch.SetName(instance.GetName())
+		if err := r.Status().Patch(ctx, patch, client.Apply, IamPolicyFieldOwner, client.ForceOwnership); err != nil {
+			logger.Error(err, "unable to update status after policy document update")
+			return ctrl.Result{}, err
+		}
+		r.Eventf(instance, corev1.EventTypeNormal, "Updated", "Updated iam policy %s", iamPolicy.Arn)
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -108,4 +171,31 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&awsv1alpha1.IamPolicy{}).
 		Complete(r)
+}
+
+func serializeDocument(instance *awsv1alpha1.IamPolicy) (string, error) {
+	// Create it
+	doc := iampolicy.NewDocument()
+	// TODO: use version
+	statements := make([]iampolicy.Statement, 0, len(instance.Spec.Document.Statements))
+	for _, statement := range instance.Spec.Document.Statements {
+		statements = append(statements, iampolicy.Statement{
+			Sid:      statement.Sid,
+			Effect:   statement.Effect,
+			Action:   statement.Actions,
+			Resource: statement.Resources,
+			// TODO: Conditions
+		})
+	}
+	doc.SetStatements(statements)
+	document, err := doc.Marshal()
+	if err != nil {
+		return "", err
+	}
+	return document, nil
+}
+
+func md5Sum(s string) string {
+	sum := md5.Sum([]byte(s))
+	return fmt.Sprintf("%x", sum)
 }
