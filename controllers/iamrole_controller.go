@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
@@ -199,6 +200,13 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		*upstream = *out
 		logger.Info("upstream iam role exists", "arn", upstream.Arn)
 	}
+	for _, ref := range instance.Spec.ManagedPolicies {
+		policy := &v1alpha1.IamPolicy{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, policy); err != nil {
+			logger.Error(err, fmt.Sprintf("unable to get reference policy %s", ref.Name))
+			continue
+		}
+	}
 
 	if instance.Status.RoleArn != upstream.Arn {
 		logger.Info("Status out of sync", "have", instance.Status.RoleArn, "want", upstream.Arn)
@@ -344,6 +352,19 @@ func (r *IamRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}}
 				}
 				return []ctrl.Request{}
+			}),
+		).
+		Watches(
+			&source.Kind{Type: &v1alpha1.IamPolicy{}},
+			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []ctrl.Request {
+				status := obj.(*v1alpha1.IamPolicy).Status
+				requests := make([]ctrl.Request, 0, len(status.AttachedRoles))
+				for _, ref := range status.AttachedRoles {
+					requests = append(requests, ctrl.Request{
+						NamespacedName: types.NamespacedName{Name: ref.Name},
+					})
+				}
+				return requests
 			}),
 		).
 		Complete(r)

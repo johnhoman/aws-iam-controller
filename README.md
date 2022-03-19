@@ -92,17 +92,8 @@ metadata:
 spec:
   description: "Iam role for the webservice application"
   maxDurationSeconds: 3600
-  policies:
-  - document:
-      statement:
-      - sid: "AllowS3Access"
-        action: "Allow"
-        resource:
-          - "s3:*"
-        condition:
-          stringLike:
-            - name: "ec2:InstanceType"
-              values: ["t1.*", "t2.*", "m3.*"]
+  policyRefs:
+  - name: webservice
 ```
 
 ### IamRoleBinding

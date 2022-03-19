@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -105,8 +106,9 @@ type IamPolicySpec struct {
 
 // IamPolicyStatus defines the observed state of IamPolicy
 type IamPolicyStatus struct {
-	Md5Sum string `json:"md5,omitempty"`
-	Arn    string `json:"arn,omitempty"`
+	Md5Sum        string                   `json:"md5,omitempty"`
+	Arn           string                   `json:"arn,omitempty"`
+	AttachedRoles []corev1.ObjectReference `json:"attachedRoles,omitempty"`
 }
 
 //+kubebuilder:object:root=true
