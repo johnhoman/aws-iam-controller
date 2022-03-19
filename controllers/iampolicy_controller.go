@@ -67,14 +67,23 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
 			// Remove the Iam Policy
 			// - Check the status for an ARN
-			if len(instance.Status.Arn) != 0 {
-				if err := r.AWS.Delete(ctx, &iampolicy.DeleteOptions{Arn: instance.Status.Arn}); err != nil {
-					logger.Error(err, "unable to delete iam policy", "arn", instance.Status.Arn)
-					return ctrl.Result{}, err
-				}
-				logger.Info("deleted resource", "arn", instance.Status.Arn)
+			options := &iampolicy.GetOptions{Arn: instance.Status.Arn}
+			if len(instance.Status.Arn) == 0 {
+				options = &iampolicy.GetOptions{Name: instance.GetName()}
+			}
+			iamPolicy, err := r.AWS.Get(ctx, options)
+			if err != nil && !aws.IsNotFound(err) {
+				logger.Error(err, "unable to get iam policy for deletion")
+				return ctrl.Result{}, err
 			} else {
-				logger.Info("arn not found in status")
+				if !aws.IsNotFound(err) {
+					if err := r.AWS.Delete(ctx, &iampolicy.DeleteOptions{Arn: iamPolicy.Arn}); err != nil {
+						logger.Error(err, "unable to delete iam policy", "arn", iamPolicy.Arn)
+						return ctrl.Result{}, err
+					}
+					logger.Info("deleted resource", "arn", iamPolicy.Arn)
+					r.Eventf(instance, corev1.EventTypeNormal, "Deleted", "Deleted iam policy %s", iamPolicy.Arn)
+				}
 			}
 
 			patch := client.MergeFrom(instance.DeepCopy())
