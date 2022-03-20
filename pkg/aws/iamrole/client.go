@@ -85,6 +85,26 @@ func (c *Client) Delete(ctx context.Context, options *DeleteOptions) error {
 	return err
 }
 
+func (c *Client) Attach(ctx context.Context, options *AttachOptions) error {
+	if _, err := c.service.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+		RoleName:  aws.String(options.Name),
+		PolicyArn: aws.String(options.PolicyArn),
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) Detach(ctx context.Context, options *DetachOptions) error {
+	if _, err := c.service.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
+		RoleName:  aws.String(options.Name),
+		PolicyArn: aws.String(options.PolicyArn),
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 var _ Interface = &Client{}
 
 func New(service pkgaws.IamRoleService, path string) *Client {

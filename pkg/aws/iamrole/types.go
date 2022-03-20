@@ -2,6 +2,13 @@ package iamrole
 
 import "time"
 
+type AttachOptions struct {
+	Name      string
+	PolicyArn string
+}
+
+type DetachOptions = AttachOptions
+
 type CreateOptions struct {
 	Name               string
 	Description        string
