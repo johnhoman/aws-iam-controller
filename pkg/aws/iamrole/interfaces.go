@@ -7,6 +7,7 @@ type Interface interface {
 	Update(ctx context.Context, options *UpdateOptions) (*IamRole, error)
 	Get(ctx context.Context, options *GetOptions) (*IamRole, error)
 	Delete(ctx context.Context, options *DeleteOptions) error
-	Attach(ctx context.Context, options *AttachOptions) error
-	Detach(ctx context.Context, options *DetachOptions) error
+	AttachPolicy(ctx context.Context, options *AttachOptions) error
+	DetachPolicy(ctx context.Context, options *DetachOptions) error
+	ListAttachedPolicies(ctx context.Context, options *ListOptions) error
 }

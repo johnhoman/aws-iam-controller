@@ -8,6 +8,7 @@ type AttachOptions struct {
 }
 
 type DetachOptions = AttachOptions
+type ListOptions = GetOptions
 
 type CreateOptions struct {
 	Name               string
