@@ -139,7 +139,7 @@ var _ = Describe("Client", func() {
 			Description: "iam test policy",
 		})
 
-		Expect(client.Attach(ctx, &iamrole.AttachOptions{
+		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
 			Name:      role.Name,
 			PolicyArn: p.Arn,
 		})).Should(Succeed())

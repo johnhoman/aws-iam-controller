@@ -85,7 +85,7 @@ func (c *Client) Delete(ctx context.Context, options *DeleteOptions) error {
 	return err
 }
 
-func (c *Client) Attach(ctx context.Context, options *AttachOptions) error {
+func (c *Client) AttachPolicy(ctx context.Context, options *AttachOptions) error {
 	if _, err := c.service.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
 		RoleName:  aws.String(options.Name),
 		PolicyArn: aws.String(options.PolicyArn),
@@ -95,13 +95,17 @@ func (c *Client) Attach(ctx context.Context, options *AttachOptions) error {
 	return nil
 }
 
-func (c *Client) Detach(ctx context.Context, options *DetachOptions) error {
+func (c *Client) DetachPolicy(ctx context.Context, options *DetachOptions) error {
 	if _, err := c.service.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
 		RoleName:  aws.String(options.Name),
 		PolicyArn: aws.String(options.PolicyArn),
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (c *Client) ListAttachedPolicies(ctx context.Context, options *ListOptions) error {
 	return nil
 }
 
