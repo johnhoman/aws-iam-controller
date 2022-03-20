@@ -116,28 +116,21 @@ var _ = Describe("IamPolicyController", func() {
 					},
 				}
 				it.Eventually().Create(iamRole).Should(Succeed())
+				it.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) > 0
+				}).Should(Succeed())
 			})
 			It("should track the iam role", func() {
-				obj := &awsv1alpha1.IamPolicy{}
-				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
-					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) > 0
-				}).Should(Succeed())
-				Expect(obj.Status.AttachedRoles[0].Name).Should(Equal(iamRole.GetName()))
+				Expect(instance.Status.AttachedRoles[0].Name).Should(Equal(iamRole.GetName()))
 			})
 			It("should ignore roles that don't reference the policy", func() {
-				obj := &awsv1alpha1.IamPolicy{}
-				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
-					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) > 0
-				}).Should(Succeed())
 				patch := client.MergeFrom(iamRole.DeepCopy())
 				iamRole.Spec.ManagedPolicies = []corev1.ObjectReference{}
 				Expect(it.Uncached().Patch(it.GetContext(), iamRole, patch)).Should(Succeed())
-				r := &awsv1alpha1.IamRole{}
-				it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, r, func(obj client.Object) bool {
+				it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, iamRole, func(obj client.Object) bool {
 					return len(obj.(*awsv1alpha1.IamRole).Spec.ManagedPolicies) == 0
 				}).Should(Succeed())
-				obj = &awsv1alpha1.IamPolicy{}
-				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
+				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {
 					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) == 0
 				}).Should(Succeed())
 			})
