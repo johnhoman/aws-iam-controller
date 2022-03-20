@@ -37,7 +37,10 @@ type IamRoleService interface {
 	UpdateRole(context.Context, *iam.UpdateRoleInput, ...func(*iam.Options)) (*iam.UpdateRoleOutput, error)
 	DeleteRole(context.Context, *iam.DeleteRoleInput, ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
 
-	UpdateAssumeRolePolicy(ctx context.Context, params *iam.UpdateAssumeRolePolicyInput, optFns ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error)
+	UpdateAssumeRolePolicy(context.Context, *iam.UpdateAssumeRolePolicyInput, ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error)
+
+	AttachRolePolicy(context.Context, *iam.AttachRolePolicyInput, ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error)
+	DetachRolePolicy(context.Context, *iam.DetachRolePolicyInput, ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error)
 }
 
 // IamService interfaces with an upstream AWS account to create iam resources

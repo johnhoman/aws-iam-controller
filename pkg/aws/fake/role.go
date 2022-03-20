@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"net/url"
 	"strings"
 
@@ -108,6 +109,47 @@ func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, 
 
 	i.Roles.Delete(aws.ToString(params.RoleName))
 	return &iam.DeleteRoleOutput{}, nil
+}
+
+func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRolePolicyInput, _ ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error) {
+	rv := &iam.AttachRolePolicyOutput{}
+	if params == nil {
+		params = &iam.AttachRolePolicyInput{}
+	}
+	key := aws.ToString(params.RoleName)
+	v, _ := i.Attachments.LoadOrStore(key, sets.NewString())
+	policies := v.(sets.String)
+	arn := aws.ToString(params.PolicyArn)
+	if !policies.Has(arn) {
+		policies.Insert(arn)
+	} else {
+		// Not sure what to do here
+		// I think this is wrong
+		return nil, &iamtypes.LimitExceededException{}
+	}
+
+	return rv, nil
+}
+
+func (i *IamService) DetachRolePolicy(_ context.Context, params *iam.DetachRolePolicyInput, _ ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error) {
+	rv := &iam.DetachRolePolicyOutput{}
+	if params == nil {
+		params = &iam.DetachRolePolicyInput{}
+	}
+
+	key := aws.ToString(params.RoleName)
+	v, ok := i.Attachments.Load(key)
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	policies := v.(sets.String)
+	arn := aws.ToString(params.PolicyArn)
+	if !policies.Has(arn) {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+
+	i.Attachments.Store(key, policies.Delete(arn))
+	return rv, nil
 }
 
 var _ pkgaws.IamRoleService = &IamService{}

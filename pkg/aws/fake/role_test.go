@@ -34,8 +34,10 @@ import (
 
 var _ = Describe("IamRoleService", func() {
 	var iamService = fake.NewIamService()
+	var inputCache = policies{}
 	BeforeEach(func() {
 		iamService.Reset()
+		inputCache.Reset()
 	})
 
 	It("should create a role", func() {
@@ -145,5 +147,30 @@ var _ = Describe("IamRoleService", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(current).To(Equal(document))
+	})
+	It("should attach an iam policy", func() {
+		policy, err := iamService.CreatePolicy(ctx, inputCache.Pop("AWSHealthFullAccess"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(policy).ShouldNot(BeNil())
+
+		role, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
+			RoleName:                 aws.String("should-update-assume-role-policy-document"),
+			AssumeRolePolicyDocument: aws.String("{}"),
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(role).ShouldNot(BeNil())
+
+		attachment, err := iamService.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+			PolicyArn: policy.Policy.Arn,
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(attachment).ShouldNot(BeNil())
+
+		_, err = iamService.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
+			PolicyArn: policy.Policy.Arn,
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
 	})
 })

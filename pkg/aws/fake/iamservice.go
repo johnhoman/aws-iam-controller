@@ -30,6 +30,7 @@ import (
 type versions []iamtypes.PolicyVersion
 
 type Cache struct {
+	Attachments     sync.Map
 	Roles           sync.Map
 	ManagedPolicies sync.Map
 	// mapping ARNs to policy names
@@ -87,6 +88,7 @@ type managedPolicy struct {
 
 func (i *IamService) Reset() {
 	i.Cache = Cache{
+		Attachments:      sync.Map{},
 		Roles:            sync.Map{},
 		ManagedPolicies:  sync.Map{},
 		policyArnMapping: sync.Map{},
