@@ -143,7 +143,7 @@ var _ = Describe("Client", func() {
 			Name:      role.Name,
 			PolicyArn: p.Arn,
 		})).Should(Succeed())
-		Expect(client.Detach(ctx, &iamrole.DetachOptions{
+		Expect(client.DetachPolicy(ctx, &iamrole.DetachOptions{
 			Name:      role.Name,
 			PolicyArn: p.Arn,
 		})).Should(Succeed())
