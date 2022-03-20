@@ -21,6 +21,11 @@ import (
 	"crypto/md5"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
@@ -48,6 +53,7 @@ const (
 	IamPolicyFieldOwner = client.FieldOwner("policy.iam.aws.controller")
 )
 
+//+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iamroles,verbs=get;list;watch
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=aws.jackhoman.com,resources=iampolicies/finalizers,verbs=update
@@ -172,13 +178,66 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		r.Eventf(instance, corev1.EventTypeNormal, "Updated", "Updated iam policy %s", iamPolicy.Arn)
 	}
 
+	matchingRolesList := &awsv1alpha1.IamRoleList{}
+	if err := r.Client.List(ctx, matchingRolesList, client.MatchingFields{"spec.policyRefs": instance.GetName()}); err != nil {
+		logger.Error(err, "unable to list iam roles")
+	}
+	items := matchingRolesList.Items
+	referenced := sets.NewString()
+	existing := sets.NewString()
+	for _, role := range items {
+		referenced.Insert(role.GetName())
+	}
+	for _, role := range instance.Status.AttachedRoles {
+		existing.Insert(role.Name)
+	}
+	if referenced.Difference(existing).Len() > 0 || existing.Difference(referenced).Len() > 0 {
+		logger.Info(fmt.Sprintf("sync attached roles - have %d, found %d", existing.Len(), referenced.Len()))
+		refs := make([]corev1.ObjectReference, 0, len(referenced))
+		for _, name := range referenced.List() {
+			refs = append(refs, corev1.ObjectReference{Name: name})
+		}
+		patch := client.MergeFrom(instance.DeepCopy())
+		instance.Status.AttachedRoles = refs
+		// TODO: switch to SSA
+		if err := r.Client.Status().Patch(ctx, instance, patch); err != nil {
+			logger.Error(err, "unable to updated attached roles")
+			return ctrl.Result{}, err
+		}
+		logger.Info("finished sync")
+	}
+
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &awsv1alpha1.IamRole{}, "spec.policyRefs", func(obj client.Object) []string {
+		role, ok := obj.(*awsv1alpha1.IamRole)
+		if !ok {
+			return []string{}
+		}
+		matches := make([]string, 0, len(role.Spec.ManagedPolicies))
+		for _, ref := range role.Spec.ManagedPolicies {
+			matches = append(matches, ref.Name)
+		}
+		return matches
+	}); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&awsv1alpha1.IamPolicy{}).
+		Watches(
+			&source.Kind{Type: &awsv1alpha1.IamRole{}},
+			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []ctrl.Request {
+				role := obj.(*awsv1alpha1.IamRole)
+				rv := make([]ctrl.Request, 0)
+				for _, item := range role.Spec.ManagedPolicies {
+					rv = append(rv, ctrl.Request{NamespacedName: types.NamespacedName{Name: item.Name}})
+				}
+				return rv
+			}),
+		).
 		Complete(r)
 }
 

@@ -25,6 +25,8 @@ import (
 	"github.com/johnhoman/controller-tools/manager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,6 +101,46 @@ var _ = Describe("IamPolicyController", func() {
 			it.Eventually().GetWhen(key, policy, func(obj client.Object) bool {
 				return obj.(*awsv1alpha1.IamPolicy).Status.Md5Sum != sum
 			}).Should(Succeed())
+		})
+		When("an iam role references the policy", func() {
+			var iamRole *awsv1alpha1.IamRole
+			BeforeEach(func() {
+				iamRole = &awsv1alpha1.IamRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("iam-role-%s", uuid.New().String()[:8]),
+					},
+					Spec: awsv1alpha1.IamRoleSpec{
+						ManagedPolicies: []corev1.ObjectReference{
+							{Name: key.Name},
+						},
+					},
+				}
+				it.Eventually().Create(iamRole).Should(Succeed())
+			})
+			It("should track the iam role", func() {
+				obj := &awsv1alpha1.IamPolicy{}
+				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) > 0
+				}).Should(Succeed())
+				Expect(obj.Status.AttachedRoles[0].Name).Should(Equal(iamRole.GetName()))
+			})
+			It("should ignore roles that don't reference the policy", func() {
+				obj := &awsv1alpha1.IamPolicy{}
+				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) > 0
+				}).Should(Succeed())
+				patch := client.MergeFrom(iamRole.DeepCopy())
+				iamRole.Spec.ManagedPolicies = []corev1.ObjectReference{}
+				Expect(it.Uncached().Patch(it.GetContext(), iamRole, patch)).Should(Succeed())
+				r := &awsv1alpha1.IamRole{}
+				it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, r, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamRole).Spec.ManagedPolicies) == 0
+				}).Should(Succeed())
+				obj = &awsv1alpha1.IamPolicy{}
+				it.Eventually().GetWhen(key, obj, func(obj client.Object) bool {
+					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) == 0
+				}).Should(Succeed())
+			})
 		})
 		When("the iam policy is marked for deletion", func() {
 			var upstream *iampolicy.IamPolicy
