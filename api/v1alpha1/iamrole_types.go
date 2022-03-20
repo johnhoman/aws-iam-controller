@@ -32,7 +32,7 @@ type IamRoleSpec struct {
 	// Foo is an example field of IamRole. Edit iamrole_types.go to remove/update
 	Description        string                   `json:"description,omitempty"`
 	MaxDurationSeconds int                      `json:"maxDurationSeconds,omitempty"`
-	ManagedPolicies    []corev1.ObjectReference `json:"policyRefs,omitempty"`
+	PolicyRefs         []corev1.ObjectReference `json:"policyRefs,omitempty"`
 }
 
 // IamRoleStatus defines the observed state of IamRole

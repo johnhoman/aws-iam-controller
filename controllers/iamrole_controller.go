@@ -200,7 +200,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		*upstream = *out
 		logger.Info("upstream iam role exists", "arn", upstream.Arn)
 	}
-	for _, ref := range instance.Spec.ManagedPolicies {
+	for _, ref := range instance.Spec.PolicyRefs {
 		policy := &v1alpha1.IamPolicy{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, policy); err != nil {
 			logger.Error(err, fmt.Sprintf("unable to get reference policy %s", ref.Name))

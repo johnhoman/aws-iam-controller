@@ -217,8 +217,8 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		if !ok {
 			return []string{}
 		}
-		matches := make([]string, 0, len(role.Spec.ManagedPolicies))
-		for _, ref := range role.Spec.ManagedPolicies {
+		matches := make([]string, 0, len(role.Spec.PolicyRefs))
+		for _, ref := range role.Spec.PolicyRefs {
 			matches = append(matches, ref.Name)
 		}
 		return matches
@@ -232,7 +232,7 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []ctrl.Request {
 				role := obj.(*awsv1alpha1.IamRole)
 				rv := make([]ctrl.Request, 0)
-				for _, item := range role.Spec.ManagedPolicies {
+				for _, item := range role.Spec.PolicyRefs {
 					rv = append(rv, ctrl.Request{NamespacedName: types.NamespacedName{Name: item.Name}})
 				}
 				return rv

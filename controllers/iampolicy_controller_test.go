@@ -110,7 +110,7 @@ var _ = Describe("IamPolicyController", func() {
 						Name: fmt.Sprintf("iam-role-%s", uuid.New().String()[:8]),
 					},
 					Spec: awsv1alpha1.IamRoleSpec{
-						ManagedPolicies: []corev1.ObjectReference{
+						PolicyRefs: []corev1.ObjectReference{
 							{Name: key.Name},
 						},
 					},
@@ -125,10 +125,10 @@ var _ = Describe("IamPolicyController", func() {
 			})
 			It("should ignore roles that don't reference the policy", func() {
 				patch := client.MergeFrom(iamRole.DeepCopy())
-				iamRole.Spec.ManagedPolicies = []corev1.ObjectReference{}
+				iamRole.Spec.PolicyRefs = []corev1.ObjectReference{}
 				Expect(it.Uncached().Patch(it.GetContext(), iamRole, patch)).Should(Succeed())
 				it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, iamRole, func(obj client.Object) bool {
-					return len(obj.(*awsv1alpha1.IamRole).Spec.ManagedPolicies) == 0
+					return len(obj.(*awsv1alpha1.IamRole).Spec.PolicyRefs) == 0
 				}).Should(Succeed())
 				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {
 					return len(obj.(*awsv1alpha1.IamPolicy).Status.AttachedRoles) == 0
