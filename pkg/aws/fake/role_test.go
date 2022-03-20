@@ -173,4 +173,60 @@ var _ = Describe("IamRoleService", func() {
 		})
 		Expect(err).ShouldNot(HaveOccurred())
 	})
+	It("should list the attached policies", func() {
+		role, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
+			RoleName:                 aws.String("should-update-assume-role-policy-document"),
+			AssumeRolePolicyDocument: aws.String("{}"),
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(role).ShouldNot(BeNil())
+
+		policy, err := iamService.CreatePolicy(ctx, inputCache.Pop("AWSHealthFullAccess"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(policy).ShouldNot(BeNil())
+
+		attachment, err := iamService.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+			PolicyArn: policy.Policy.Arn,
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(attachment).ShouldNot(BeNil())
+
+		out, err := iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+			RoleName: role.Role.RoleName,
+			PathPrefix: role.Role.Path,
+		})
+
+		Expect(out.AttachedPolicies).Should(HaveLen(1))
+
+		policy, err = iamService.CreatePolicy(ctx, inputCache.Pop("ClientVPNServiceRolePolicy"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(policy).ShouldNot(BeNil())
+
+		attachment, err = iamService.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+			PolicyArn: policy.Policy.Arn,
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(attachment).ShouldNot(BeNil())
+
+		out, err = iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+			RoleName: role.Role.RoleName,
+			PathPrefix: role.Role.Path,
+		})
+		Expect(out.AttachedPolicies).Should(HaveLen(2))
+
+		detachment, err := iamService.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
+			PolicyArn: policy.Policy.Arn,
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(detachment).ShouldNot(BeNil())
+
+		out, err = iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+			RoleName: role.Role.RoleName,
+			PathPrefix: role.Role.Path,
+		})
+		Expect(out.AttachedPolicies).Should(HaveLen(1))
+	})
 })

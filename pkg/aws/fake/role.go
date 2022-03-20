@@ -152,4 +152,37 @@ func (i *IamService) DetachRolePolicy(_ context.Context, params *iam.DetachRoleP
 	return rv, nil
 }
 
+func (i *IamService) ListAttachedRolePolicies(
+	_ context.Context,
+	params *iam.ListAttachedRolePoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	rv := &iam.ListAttachedRolePoliciesOutput{}
+
+	if params == nil {
+		params = &iam.ListAttachedRolePoliciesInput{}
+	}
+
+	key := aws.ToString(params.RoleName)
+	v, ok := i.Attachments.Load(key)
+	if !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
+	arns := v.(sets.String).List()
+	attachments := make([]iamtypes.AttachedPolicy, 0, len(arns))
+
+	for _, arn := range arns {
+		v, ok := i.policyArnMapping.Load(arn)
+		if !ok {
+			// Error
+		}
+		attachments = append(attachments, iamtypes.AttachedPolicy{
+			PolicyArn:  aws.String(arn),
+			PolicyName: aws.String(v.(string)),
+		})
+	}
+	rv.AttachedPolicies = attachments
+	return rv, nil
+}
+
 var _ pkgaws.IamRoleService = &IamService{}
