@@ -79,6 +79,38 @@ kubectl patch deployment aws-iam-controller-controller-manager \
     --patch "$(cat patch.json)"
 ```
 
+#### Note
+The better way to do this would probably just be use kustomization e.g.
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- github.com/johnhoman/aws-iam-controller/config/default?ref=main
+patchesJson6902:
+- target:
+    version: v1
+    kind: Deployment
+    group: apps
+    name: aws-iam-controller-controller-manager
+    namespace: aws-iam-controller-system
+  patch: |-
+    - op: add
+      path: /spec/template/spec/containers/1/args/-
+      value: "--oidc-arn=arn:aws:iam::<account-id>:oidc-provider/<oidc-issuer>"
+    - op: add
+      path: /spec/template/spec/containers/1/args/-
+      value: "--resource-default-path=<cluster-name>"
+- target:
+    version: v1
+    kind: ServiceAccount
+    name: aws-iam-controller-controller-manager
+    namespace: aws-iam-controller-system
+  patch: |-
+    - op: add
+      path: "/metadata/annotations"
+      value: {"eks.amazonaws.com/role-arn": "<role-arn>"}
+```
 
 ## Custom Resources
 
