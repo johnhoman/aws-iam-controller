@@ -112,7 +112,6 @@ func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, 
 }
 
 func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRolePolicyInput, _ ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error) {
-	rv := &iam.AttachRolePolicyOutput{}
 	if params == nil {
 		params = &iam.AttachRolePolicyInput{}
 	}
@@ -120,6 +119,9 @@ func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRoleP
 	v, _ := i.Attachments.LoadOrStore(key, sets.NewString())
 	policies := v.(sets.String)
 	arn := aws.ToString(params.PolicyArn)
+	if _, ok := i.policyArnMapping.Load(arn); !ok {
+		return nil, &iamtypes.NoSuchEntityException{}
+	}
 	if !policies.Has(arn) {
 		policies.Insert(arn)
 	} else {
@@ -128,7 +130,7 @@ func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRoleP
 		return nil, &iamtypes.LimitExceededException{}
 	}
 
-	return rv, nil
+	return &iam.AttachRolePolicyOutput{}, nil
 }
 
 func (i *IamService) DetachRolePolicy(_ context.Context, params *iam.DetachRolePolicyInput, _ ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error) {
@@ -162,19 +164,21 @@ func (i *IamService) ListAttachedRolePolicies(
 	if params == nil {
 		params = &iam.ListAttachedRolePoliciesInput{}
 	}
-
-	key := aws.ToString(params.RoleName)
-	v, ok := i.Attachments.Load(key)
+	_, ok := i.Roles.Load(aws.ToString(params.RoleName))
 	if !ok {
 		return nil, &iamtypes.NoSuchEntityException{}
 	}
+
+	key := aws.ToString(params.RoleName)
+	v, _ := i.Attachments.LoadOrStore(key, sets.NewString())
 	arns := v.(sets.String).List()
 	attachments := make([]iamtypes.AttachedPolicy, 0, len(arns))
 
 	for _, arn := range arns {
 		v, ok := i.policyArnMapping.Load(arn)
 		if !ok {
-			// Error
+			// TODO: This shouldn't be possible
+			continue
 		}
 		attachments = append(attachments, iamtypes.AttachedPolicy{
 			PolicyArn:  aws.String(arn),

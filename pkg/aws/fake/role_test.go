@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -193,7 +194,7 @@ var _ = Describe("IamRoleService", func() {
 		Expect(attachment).ShouldNot(BeNil())
 
 		out, err := iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-			RoleName: role.Role.RoleName,
+			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
 
@@ -211,7 +212,7 @@ var _ = Describe("IamRoleService", func() {
 		Expect(attachment).ShouldNot(BeNil())
 
 		out, err = iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-			RoleName: role.Role.RoleName,
+			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
 		Expect(out.AttachedPolicies).Should(HaveLen(2))
@@ -224,9 +225,24 @@ var _ = Describe("IamRoleService", func() {
 		Expect(detachment).ShouldNot(BeNil())
 
 		out, err = iamService.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-			RoleName: role.Role.RoleName,
+			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
 		Expect(out.AttachedPolicies).Should(HaveLen(1))
+	})
+	It("should return an error when trying to attach a policy that doesn't exist", func() {
+		role, err := iamService.CreateRole(ctx, &iam.CreateRoleInput{
+			RoleName:                 aws.String("should-update-assume-role-policy-document"),
+			AssumeRolePolicyDocument: aws.String("{}"),
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(role).ShouldNot(BeNil())
+
+		attachment, err := iamService.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+			PolicyArn: aws.String(uuid.New().String()),
+			RoleName:  role.Role.RoleName,
+		})
+		Expect(err).Should(HaveOccurred())
+		Expect(attachment).Should(BeNil())
 	})
 })
