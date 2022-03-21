@@ -50,14 +50,14 @@ AWS_ROLE_ARN=$(terraform output role-arn)
 kubectl apply -k "github.com/johnhoman/aws-iam-controller/config/default?ref=main"
 ```
 
-### Patch the service account
+### Patch the controller service account
 ```shell
 kubectl annotate serviceaccount aws-iam-controller-manager \
     eks.amazonaws.com/role-arn=${AWS_ROLE_ARN} \
     -n aws-iam-controller-system
 ```
 
-### Patch the deployment
+### Patch the controller deployment
 ```shell
 cat <<EOF > patch.json
 [
