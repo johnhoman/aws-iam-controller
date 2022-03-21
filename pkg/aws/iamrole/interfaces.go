@@ -9,5 +9,5 @@ type Interface interface {
 	Delete(ctx context.Context, options *DeleteOptions) error
 	AttachPolicy(ctx context.Context, options *AttachOptions) error
 	DetachPolicy(ctx context.Context, options *DetachOptions) error
-	ListAttachedPolicies(ctx context.Context, options *ListOptions) error
+	ListAttachedPolicies(ctx context.Context, options *ListOptions) (AttachedPolicies, error)
 }

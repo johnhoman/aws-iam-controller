@@ -148,4 +148,43 @@ var _ = Describe("Client", func() {
 			PolicyArn: p.Arn,
 		})).Should(Succeed())
 	})
+	It("should list the attached policies", func() {
+		var policyClient = iampolicy.New(service, namespace)
+		var err error
+		role, err = client.Create(ctx, &iamrole.CreateOptions{
+			Name:               fmt.Sprintf("iam-role-%s", uuid.New().String()),
+			Description:        "aws iam controller tests",
+			MaxDurationSeconds: 3600,
+			PolicyDocument:     policy,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+
+		p, err := policyClient.Create(ctx, &iampolicy.CreateOptions{
+			Name:        "iam-policy-" + uuid.New().String()[:8],
+			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
+			Description: "iam test policy",
+		})
+		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
+			Name:      role.Name,
+			PolicyArn: p.Arn,
+		})).Should(Succeed())
+		p, err = policyClient.Create(ctx, &iampolicy.CreateOptions{
+			Name:        "iam-policy-" + uuid.New().String()[:8],
+			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
+			Description: "iam test policy",
+		})
+		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
+			Name:      role.Name,
+			PolicyArn: p.Arn,
+		})).Should(Succeed())
+		policies, err := client.ListAttachedPolicies(ctx, &iamrole.ListOptions{
+			Name: role.Name,
+		})
+		Expect(policies.Len()).Should(Equal(2))
+	})
+	It("should return error when input is invalid", func() {
+		out, err := client.ListAttachedPolicies(ctx, &iamrole.ListOptions{Name: ""})
+		Expect(err).Should(HaveOccurred())
+		Expect(out).Should(BeNil())
+	})
 })

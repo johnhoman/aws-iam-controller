@@ -3,9 +3,11 @@ package iamrole
 import (
 	"context"
 	"fmt"
+	"net/url"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"net/url"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
@@ -105,8 +107,25 @@ func (c *Client) DetachPolicy(ctx context.Context, options *DetachOptions) error
 	return nil
 }
 
-func (c *Client) ListAttachedPolicies(ctx context.Context, options *ListOptions) error {
-	return nil
+func (c *Client) ListAttachedPolicies(ctx context.Context, options *ListOptions) (AttachedPolicies, error) {
+	if len(options.Name) == 0 {
+		return nil, &iamtypes.InvalidInputException{}
+	}
+	out, err := c.service.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String(options.Name),
+		// This is actually probably not a good idea. The policies are created
+		// with a different client so the path prefix aren't the same value
+		PathPrefix: aws.String(c.path),
+	})
+	if err != nil {
+		return nil, err
+	}
+	rv := AttachedPolicies{}
+	for _, p := range out.AttachedPolicies {
+		rv.Insert(aws.ToString(p.PolicyName), aws.ToString(p.PolicyArn))
+	}
+
+	return rv, nil
 }
 
 var _ Interface = &Client{}
