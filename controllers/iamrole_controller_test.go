@@ -19,6 +19,7 @@ package controllers
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	corev1 "k8s.io/api/core/v1"
@@ -276,6 +277,112 @@ var _ = Describe("IamRoleController", func() {
 						return err
 					}).ShouldNot(HaveOccurred())
 				})
+			})
+		})
+	})
+})
+
+var _ = Describe("IamRoleController Policy Refs", func() {
+	var mgr manager.IntegrationTest
+	var iamService pkgaws.IamService
+	var roleService iamrole.Interface
+	BeforeEach(func() {
+		iamService = newIamService()
+		roleService = iamrole.New(iamService, "controller-test")
+		bm := bindmanager.New(
+			roleService,
+			"arn:aws:iam::111122223333:oidc-provider/oidc.eks.region-code.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E",
+		)
+
+		c, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(c).ToNot(BeNil())
+
+		mgr = manager.IntegrationTestBuilder().
+			WithScheme(scheme.Scheme).
+			Complete(cfg)
+
+		policy := defaultPolicy()
+		raw, err := json.Marshal(policy)
+		Expect(err).To(BeNil())
+
+		Expect((&IamRoleReconciler{
+			Client:        mgr.GetClient(),
+			Scheme:        mgr.GetScheme(),
+			EventRecorder: mgr.GetEventRecorderFor("controller.test"),
+			notify:        &notifier{},
+			DefaultPolicy: string(raw),
+			RoleService:   roleService,
+			Manager:       bm,
+		}).SetupWithManager(mgr)).Should(Succeed())
+		mgr.StartManager()
+	})
+	AfterEach(func() { mgr.StopManager() })
+	When("the resource exists", func() {
+		var name string
+		var instance *v1alpha1.IamRole
+		var key types.NamespacedName
+		var policyName string
+		BeforeEach(func() {
+			policyName = "iam-policy-" + uuid.New().String()[:8]
+			name = "the-resource-exists-" + uuid.New().String()[:8]
+			key = types.NamespacedName{Name: name}
+			instance = &v1alpha1.IamRole{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1alpha1.IamRoleSpec{
+					PolicyRefs: []corev1.ObjectReference{{Name: policyName}},
+				},
+			}
+
+			mgr.Eventually().Create(instance).Should(Succeed())
+			instance = &v1alpha1.IamRole{}
+			mgr.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
+				return cu.ContainsFinalizer(obj, Finalizer)
+			}).Should(Succeed())
+		})
+		When("an iam policy exists", func() {
+			var policy *v1alpha1.IamPolicy
+			var policyClient iampolicy.Interface
+			BeforeEach(func() {
+				policyClient = iampolicy.New(iamService, "controller-test")
+				p, err := policyClient.Create(mgr.GetContext(), &iampolicy.CreateOptions{
+					Name:     policyName,
+					Document: "{}",
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(p).ShouldNot(BeNil())
+				policy = &v1alpha1.IamPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: policyName,
+					},
+					Spec: v1alpha1.IamPolicySpec{
+						Document: v1alpha1.IamPolicyDocument{
+							Statements: []v1alpha1.Statement{{
+								Effect:    v1alpha1.PolicyStatementEffectAllow,
+								Actions:   []string{"s3:ListBucket", "s3:CreateBucket", "s3:DeleteBucket"},
+								Resources: []string{"*"},
+							}},
+						},
+					},
+				}
+				mgr.Eventually().Create(policy).Should(Succeed())
+				patch := client.MergeFrom(policy.DeepCopy())
+				policy.Status.Arn = p.Arn
+				Expect(mgr.Uncached().Status().Patch(mgr.GetContext(), policy, patch)).Should(Succeed())
+				mgr.Eventually().GetWhen(types.NamespacedName{Name: policyName}, &v1alpha1.IamPolicy{}, func(obj client.Object) bool {
+					return len(obj.(*v1alpha1.IamPolicy).Status.Arn) > 0
+				}).Should(Succeed())
+			})
+			It("should attach the iam policy", func() {
+				Eventually(func() iamrole.AttachedPolicies {
+					attached, err := roleService.ListAttachedPolicies(mgr.GetContext(), &iamrole.ListOptions{
+						Name: instance.GetName(),
+					})
+					if err != nil {
+						return nil
+					}
+					return attached
+				}).Should(HaveLen(1))
 			})
 		})
 	})

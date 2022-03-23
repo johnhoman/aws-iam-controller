@@ -200,12 +200,43 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		*upstream = *out
 		logger.Info("upstream iam role exists", "arn", upstream.Arn)
 	}
+	// Need attached policies
+	policies, err := r.RoleService.ListAttachedPolicies(ctx, &iamrole.ListOptions{Name: instance.GetName()})
+	if err != nil {
+		logger.Error(err, "unable to list attached policies")
+		return ctrl.Result{}, err
+	}
+	attachments := policies.ToMap()
 	for _, ref := range instance.Spec.PolicyRefs {
-		policy := &v1alpha1.IamPolicy{}
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, policy); err != nil {
-			logger.Error(err, fmt.Sprintf("unable to get reference policy %s", ref.Name))
-			continue
+		if attachments.Contains(ref.Name) {
+			attachments.Delete(ref.Name)
+		} else {
+			// Policy isn't attach -- attach it
+			refLog := logger.WithValues("policyRef", ref.Name)
+			policy := &v1alpha1.IamPolicy{}
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, policy); err != nil {
+				logger.Error(err, fmt.Sprintf("unable to get referenced policy %s", ref.Name))
+				continue
+			}
+			arn := policy.Status.Arn
+			if len(arn) == 0 {
+				r.Event(instance, corev1.EventTypeWarning, "InvalidPolicy", "Cannot attach policy with missing policy arn")
+			}
+			options := &iamrole.AttachOptions{Name: instance.GetName(), PolicyArn: arn}
+			if err := r.RoleService.AttachPolicy(ctx, options); err != nil {
+				refLog.Error(err, "unable to attach policy")
+			}
 		}
+	}
+	// The remaining policies should be detached because they aren't reference
+	// by the role
+	for _, arn := range attachments {
+		options := &iamrole.DetachOptions{Name: instance.GetName(), PolicyArn: arn}
+		if err := r.RoleService.DetachPolicy(ctx, options); err != nil {
+			logger.Error(err, "unable to detach policy", "arn", arn)
+		}
+		r.Eventf(instance, corev1.EventTypeNormal, "DetachPolicy", "detached policy %s", arn)
+		logger.Info("detached non-referenced policy", "arn", arn)
 	}
 
 	if instance.Status.RoleArn != upstream.Arn {
