@@ -19,9 +19,12 @@ package controllers
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
+	"github.com/johnhoman/controller-tools/manager"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,10 +32,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
-	"github.com/johnhoman/controller-tools/manager"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -368,9 +367,10 @@ var _ = Describe("IamRoleController Policy Refs", func() {
 				mgr.Eventually().Create(policy).Should(Succeed())
 				patch := client.MergeFrom(policy.DeepCopy())
 				policy.Status.Arn = p.Arn
+				policy.Status.AttachedRoles = []corev1.ObjectReference{{Name: instance.GetName()}}
 				Expect(mgr.Uncached().Status().Patch(mgr.GetContext(), policy, patch)).Should(Succeed())
 				mgr.Eventually().GetWhen(types.NamespacedName{Name: policyName}, &v1alpha1.IamPolicy{}, func(obj client.Object) bool {
-					return len(obj.(*v1alpha1.IamPolicy).Status.Arn) > 0
+					return len(obj.(*v1alpha1.IamPolicy).Status.AttachedRoles) > 0
 				}).Should(Succeed())
 			})
 			It("should attach the iam policy", func() {
@@ -383,6 +383,38 @@ var _ = Describe("IamRoleController Policy Refs", func() {
 					}
 					return attached
 				}).Should(HaveLen(1))
+			})
+			When("a reference is removed", func() {
+				BeforeEach(func() {
+					Eventually(func() iamrole.AttachedPolicies {
+						attached, err := roleService.ListAttachedPolicies(mgr.GetContext(), &iamrole.ListOptions{
+							Name: instance.GetName(),
+						})
+						if err != nil {
+							return nil
+						}
+						return attached
+					}).Should(HaveLen(1))
+					mgr.Eventually().Get(key, instance).Should(Succeed())
+					patch := client.MergeFrom(instance.DeepCopy())
+					instance.Spec.PolicyRefs = []corev1.ObjectReference{}
+					Expect(mgr.Uncached().Patch(mgr.GetContext(), instance, patch)).Should(Succeed())
+					mgr.Eventually().GetWhen(key, &v1alpha1.IamRole{}, func(obj client.Object) bool {
+						return len(obj.(*v1alpha1.IamRole).Spec.PolicyRefs) == 0
+					}).Should(Succeed())
+				})
+				It("should detach the policy when the reference is removed", func() {
+					Eventually(func() iamrole.AttachedPolicies {
+						attached, err := roleService.ListAttachedPolicies(mgr.GetContext(), &iamrole.ListOptions{
+							Name: instance.GetName(),
+						})
+						if err != nil {
+							return nil
+						}
+						return attached
+					}).Should(HaveLen(0))
+				})
+
 			})
 		})
 	})

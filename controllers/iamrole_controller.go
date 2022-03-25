@@ -18,7 +18,9 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
@@ -206,9 +208,12 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		logger.Error(err, "unable to list attached policies")
 		return ctrl.Result{}, err
 	}
+	// policies attached to the role from aws
 	attachments := policies.ToMap()
 	for _, ref := range instance.Spec.PolicyRefs {
 		if attachments.Contains(ref.Name) {
+			// If it's reference and attached then we don't need to add it,
+			//   and we also don't need to remove it
 			attachments.Delete(ref.Name)
 		} else {
 			// Policy isn't attach -- attach it
@@ -216,15 +221,23 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			policy := &v1alpha1.IamPolicy{}
 			if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, policy); err != nil {
 				logger.Error(err, fmt.Sprintf("unable to get referenced policy %s", ref.Name))
-				continue
-			}
-			arn := policy.Status.Arn
-			if len(arn) == 0 {
-				r.Event(instance, corev1.EventTypeWarning, "InvalidPolicy", "Cannot attach policy with missing policy arn")
-			}
-			options := &iamrole.AttachOptions{Name: instance.GetName(), PolicyArn: arn}
-			if err := r.RoleService.AttachPolicy(ctx, options); err != nil {
-				refLog.Error(err, "unable to attach policy")
+			} else {
+				arn := policy.Status.Arn
+				if len(arn) == 0 {
+					r.Event(instance, corev1.EventTypeWarning, "InvalidPolicy", "Cannot attach policy with missing policy arn")
+				} else {
+					options := &iamrole.AttachOptions{Name: instance.GetName(), PolicyArn: arn}
+					if err := r.RoleService.AttachPolicy(ctx, options); err != nil {
+						T := &iamtypes.NoSuchEntityException{}
+						if errors.As(err, &T) {
+							r.Eventf(instance, corev1.EventTypeNormal, "PolicyNotFound", "policy %s does not exist", arn)
+						} else {
+							refLog.Error(err, "unable to attach policy")
+						}
+					} else {
+						r.Eventf(instance, corev1.EventTypeNormal, "AttachedPolicy", "attached policy %s to role", arn)
+					}
+				}
 			}
 		}
 	}
