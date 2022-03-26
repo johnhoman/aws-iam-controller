@@ -53,7 +53,6 @@ var namespacedClient client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
-var ns *corev1.Namespace
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
