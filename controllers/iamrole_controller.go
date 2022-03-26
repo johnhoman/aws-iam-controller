@@ -51,31 +51,31 @@ var (
 	upstreamPolicyDocumentInvalid = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: PrometheusNamespace,
 		Subsystem: PrometheusSubsystem,
-		Name:      "role_upstream_policy_document_invalid",
+		Name:      "role_upstream_policy_document_invalid_total",
 		Help:      "The policy document retrieved from aws for this role is invalid",
 	}, []string{"roleName"})
 	roleCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: PrometheusNamespace,
 		Subsystem: PrometheusSubsystem,
-		Name:      "role_created",
+		Name:      "role_created_total",
 		Help:      "Created a new aws iam role",
 	}, []string{"roleName"})
 	roleUpdated = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: PrometheusNamespace,
 		Subsystem: PrometheusSubsystem,
-		Name:      "role_updated",
+		Name:      "role_updated_total",
 		Help:      "Updated the aws iam role",
 	}, []string{"roleName"})
 	roleDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: PrometheusNamespace,
 		Subsystem: PrometheusSubsystem,
-		Name:      "role_deleted",
+		Name:      "role_deleted_total",
 		Help:      "Deleted an existing aws iam role",
 	}, []string{"roleName"})
 	roleTrustPolicyUpdated = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: PrometheusNamespace,
 		Subsystem: PrometheusSubsystem,
-		Name:      "role_trust_policy_updated",
+		Name:      "role_trust_policy_updated_total",
 		Help:      "Deleted an existing aws iam role",
 	}, []string{"roleName"})
 )
@@ -273,7 +273,7 @@ func (r *IamRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *IamRoleReconciler) updateTrustPolicy(ctx context.Context, instance *v1alpha1.IamRole) error {
 	logger := log.FromContext(ctx).WithValues("method", "UpdateTrustPolicy")
-	logger.V(4).Info("updating trust policy for iam role")
+	logger.Info("updating trust policy for iam role")
 
 	bindings := &v1alpha1.IamRoleBindingList{}
 	if err := r.Client.List(ctx, bindings, client.MatchingFields{"spec.iamRoleRef.name": instance.GetName()}); err != nil {
@@ -281,7 +281,7 @@ func (r *IamRoleReconciler) updateTrustPolicy(ctx context.Context, instance *v1a
 		return err
 	}
 	for _, item := range bindings.Items {
-		logger.V(4).Info("identified role binding", "bindingName", item.Name)
+		logger.Info("identified role binding", "bindingName", item.Name)
 	}
 	objectRefs := make([]corev1.ObjectReference, 0, len(bindings.Items))
 	for _, binding := range bindings.Items {

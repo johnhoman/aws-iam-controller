@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -69,12 +68,14 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ctrl.Result{}, err
 		}
 	}
-	if len(instance.Status.BoundServiceAccountRef.Name) > 0 && instance.Status.BoundServiceAccountRef != instance.Spec.ServiceAccountRef {
+	boundServiceAccountName := boundServiceAccountKey(instance).Name
+	refServiceAccountName := referencedServiceAccountKey(instance).Name
+	if isSet(boundServiceAccountName) && boundServiceAccountName != refServiceAccountName {
 		logger.Info("sync service accounts",
 			"have",
-			instance.Status.BoundServiceAccountRef,
+			boundServiceAccountName,
 			"want",
-			instance.Spec.ServiceAccountRef,
+			refServiceAccountName,
 		)
 		if err := r.finalize(ctx, instance); err != nil {
 			logger.Error(err, "unable to remove binding from service account")
@@ -83,18 +84,13 @@ func (r *IamRoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	iamRole := &awsv1alpha1.IamRole{}
-	if err := r.Client.Get(ctx, types.NamespacedName{
-		Name: instance.Spec.IamRoleRef.Name,
-		// TODO: remove namespace when iam role is switched to cluster scope
-		Namespace: instance.Namespace,
-	}, iamRole); err != nil {
+	if err := r.Client.Get(ctx, roleRefKey(instance), iamRole); err != nil {
 		logger.Error(err, "unable to get IamRole")
 		return ctrl.Result{}, err
 	}
 
 	if len(iamRole.Status.RoleArn) == 0 {
-		err := fmt.Errorf("")
-		logger.Error(err, "IamRole is missing role-arn from status")
+		err := NewInvalidRoleStatus("IamRole is missing role-arn from status")
 		return ctrl.Result{}, err
 	}
 
@@ -143,7 +139,7 @@ func (r *IamRoleBindingReconciler) bindServiceAccount(
 	if ok && existing != iamRole.Status.RoleArn {
 		// Something else is bound to this instance
 		r.Event(instance, corev1.EventTypeWarning, "Conflict", "Service account is already bound to an iam role")
-		return fmt.Errorf("unable to bind service account because of conflict")
+		return NewConflict("unable to bind service account")
 	}
 	if !ok {
 		patch := client.MergeFrom(serviceAccount.DeepCopy())
@@ -165,7 +161,7 @@ func (r *IamRoleBindingReconciler) finalize(ctx context.Context, instance *awsv1
 		return nil
 	}
 	serviceAccount := &corev1.ServiceAccount{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: instance.Status.BoundServiceAccountRef.Name}, serviceAccount); err != nil {
+	if err := k8s.Get(ctx, boundServiceAccountKey(instance), serviceAccount); err != nil {
 		logger.Error(err, "unable to get service account")
 		return client.IgnoreNotFound(err)
 	}
@@ -194,3 +190,27 @@ func (r *IamRoleBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 var _ reconcile.Reconciler = &IamRoleBindingReconciler{}
+
+func boundServiceAccountKey(instance *awsv1alpha1.IamRoleBinding) types.NamespacedName {
+	key := types.NamespacedName{}
+	key.Name = instance.Status.BoundServiceAccountRef.Name
+	key.Namespace = instance.GetNamespace()
+	return key
+}
+
+func roleRefKey(instance *awsv1alpha1.IamRoleBinding) types.NamespacedName {
+	key := types.NamespacedName{}
+	key.Name = instance.Spec.IamRoleRef.Name
+	return key
+}
+
+func referencedServiceAccountKey(instance *awsv1alpha1.IamRoleBinding) types.NamespacedName {
+	key := types.NamespacedName{}
+	key.Name = instance.Spec.ServiceAccountRef.Name
+	key.Namespace = instance.GetNamespace()
+	return key
+}
+
+func isSet(s string) bool {
+	return len(s) > 0
+}

@@ -245,7 +245,6 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func toMap(conditions []awsv1alpha1.Condition) map[string][]string {
-
 	m := map[string][]string{}
 	for _, condition := range conditions {
 		m[condition.Key] = condition.Values
@@ -254,10 +253,14 @@ func toMap(conditions []awsv1alpha1.Condition) map[string][]string {
 }
 
 func serializeDocument(instance *awsv1alpha1.IamPolicy) (string, error) {
-	// Create it
 	doc := iampolicy.NewDocument()
 	// TODO: use version
-	statements := make([]iampolicy.Statement, 0, len(instance.Spec.Document.Statements))
+	statements := make(
+		[]iampolicy.Statement,
+		0,
+		len(instance.Spec.Document.Statements),
+	)
+
 	for _, statement := range instance.Spec.Document.Statements {
 		var conditions *iampolicy.Conditions
 		if statement.Conditions != nil {
