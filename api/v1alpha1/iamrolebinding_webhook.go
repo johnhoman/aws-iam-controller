@@ -32,7 +32,6 @@ func (r *IamRoleBinding) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-
 //+kubebuilder:webhook:path=/mutate-aws-jackhoman-com-v1alpha1-iamrolebinding,mutating=true,failurePolicy=fail,sideEffects=None,groups=aws.jackhoman.com,resources=iamrolebindings,verbs=create;update,versions=v1alpha1,name=miamrolebinding.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &IamRoleBinding{}
@@ -40,7 +39,6 @@ var _ webhook.Defaulter = &IamRoleBinding{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *IamRoleBinding) Default() {
 	iamrolebindinglog.Info("default", "name", r.Name)
-
 }
 
 //+kubebuilder:webhook:path=/validate-aws-jackhoman-com-v1alpha1-iamrolebinding,mutating=false,failurePolicy=fail,sideEffects=None,groups=aws.jackhoman.com,resources=iamrolebindings,verbs=create;update,versions=v1alpha1,name=viamrolebinding.kb.io,admissionReviewVersions=v1

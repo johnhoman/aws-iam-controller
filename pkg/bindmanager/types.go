@@ -13,25 +13,25 @@ type Binding struct {
 }
 
 type condition struct {
-	StringEquals map[string]interface{} `json:",omitempty"`
+	StringEquals map[string]interface{} `json:",omitempty"` // nolint: tagliatelle
 }
 
 type principal struct {
-	AWS       interface{} `json:",omitempty"`
-	Federated string      `json:",omitempty"`
+	AWS       interface{} `json:",omitempty"` // nolint: tagliatelle
+	Federated string      `json:",omitempty"` // nolint: tagliatelle
 }
 
 type statement struct {
-	Sid       string    `json:",omitempty"`
-	Effect    string    `json:",omitempty"`
-	Principal principal `json:",omitempty"`
-	Action    string    `json:",omitempty"`
-	Condition condition `json:",omitempty"`
+	Sid       string    `json:",omitempty"` // nolint: tagliatelle
+	Effect    string    `json:",omitempty"` // nolint: tagliatelle
+	Principal principal `json:",omitempty"` // nolint: tagliatelle
+	Action    string    `json:",omitempty"` // nolint: tagliatelle
+	Condition condition `json:",omitempty"` // nolint: tagliatelle
 }
 
 type policyDocument struct {
 	Version    string
-	Statements []statement `json:"Statement"`
+	Statements []statement `json:"Statement"` // nolint: tagliatelle
 }
 
 func (pd *policyDocument) Marshal() (string, error) {

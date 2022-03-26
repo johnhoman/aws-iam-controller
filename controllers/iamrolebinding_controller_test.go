@@ -1,8 +1,6 @@
 package controllers_test
 
 import (
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/controllers"
 	"github.com/johnhoman/controller-tools/manager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -11,6 +9,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/controllers"
 )
 
 var _ = Describe("IamRoleBindingController", func() {
@@ -92,44 +93,60 @@ var _ = Describe("IamRoleBindingController", func() {
 				})
 				When("the role binding is deleted", func() {
 					BeforeEach(func() {
-						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
-							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
-						}).Should(Succeed())
+						it.Eventually().GetWhen(
+							types.NamespacedName{Name: randomName},
+							&corev1.ServiceAccount{},
+							func(obj client.Object) bool {
+								meta := obj.(*corev1.ServiceAccount).ObjectMeta
+								return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
+							},
+						).Should(Succeed())
 					})
 					JustBeforeEach(func() {
 						it.Expect().Delete(binding).Should(Succeed())
 					})
 					It("removes the service account annotation", func() {
 						instance := &corev1.ServiceAccount{}
-						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
-							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return !metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
-						}).Should(Succeed())
+						it.Eventually().GetWhen(
+							types.NamespacedName{Name: randomName},
+							instance,
+							func(obj client.Object) bool {
+								meta := obj.(*corev1.ServiceAccount).ObjectMeta
+								return !metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
+							},
+						).Should(Succeed())
 					})
 				})
 				When("the service account ref is changed", func() {
 					var other *corev1.ServiceAccount
 					BeforeEach(func() {
-						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
-							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
-						}).Should(Succeed())
-						other = &corev1.ServiceAccount{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "other",
+						namespacedName := types.NamespacedName{Name: randomName}
+						it.Eventually().GetWhen(
+							namespacedName,
+							&corev1.ServiceAccount{},
+							func(obj client.Object) bool {
+								meta := obj.(*corev1.ServiceAccount).ObjectMeta
+								return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
 							},
+						).Should(Succeed())
+						other = &corev1.ServiceAccount{
+							ObjectMeta: metav1.ObjectMeta{Name: "other"},
 						}
 						it.Eventually().Create(other).Should(Succeed())
 
 						instance := &v1alpha1.IamRoleBinding{}
-						it.Eventually().Get(types.NamespacedName{Name: randomName}, instance).Should(Succeed())
+						it.Eventually().Get(namespacedName, instance).Should(Succeed())
 						patch := client.MergeFrom(instance.DeepCopy())
 						instance.Spec.ServiceAccountRef.Name = "other"
 						Expect(it.Uncached().Patch(it.GetContext(), instance, patch)).Should(Succeed())
-						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(o client.Object) bool {
-							return o.(*v1alpha1.IamRoleBinding).Spec.ServiceAccountRef.Name == "other"
-						}).Should(Succeed())
+						it.Eventually().GetWhen(
+							namespacedName,
+							instance,
+							func(o client.Object) bool {
+								ref := o.(*v1alpha1.IamRoleBinding).Spec.ServiceAccountRef
+								return ref.Name == "other"
+							},
+						).Should(Succeed())
 					})
 					It("removes the service account annotation from the old service account", func() {
 						instance := &corev1.ServiceAccount{}

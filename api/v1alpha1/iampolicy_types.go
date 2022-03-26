@@ -52,10 +52,10 @@ type Conditions struct {
 	DateGreaterThanIfExists           []Condition `json:"dateGreaterThanIfExists,omitempty"`
 	DateGreaterThanEquals             []Condition `json:"dateGreaterThanEquals,omitempty"`
 	DateGreaterThanEqualsIfExists     []Condition `json:"dateGreaterThanEqualsIfExists,omitempty"`
-	IpAddress                         []Condition `json:"ipAddress,omitempty"`
-	IpAddressIfExists                 []Condition `json:"ipAddressIfExists,omitempty"`
-	NotIpAddress                      []Condition `json:"notIpAddress,omitempty"`
-	NotIpAddressIfExists              []Condition `json:"notIpAddressIfExists,omitempty"`
+	IpAddress                         []Condition `json:"ipAddress,omitempty"`            // nolint: revive
+	IpAddressIfExists                 []Condition `json:"ipAddressIfExists,omitempty"`    // nolint: revive
+	NotIpAddress                      []Condition `json:"notIpAddress,omitempty"`         // nolint: revive
+	NotIpAddressIfExists              []Condition `json:"notIpAddressIfExists,omitempty"` // nolint: revive
 	NumericEquals                     []Condition `json:"numericEquals,omitempty"`
 	NumericEqualsIfExists             []Condition `json:"numericEqualsIfExists,omitempty"`
 	NumericNotEquals                  []Condition `json:"numericNotEquals,omitempty"`

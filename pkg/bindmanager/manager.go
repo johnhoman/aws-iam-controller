@@ -16,7 +16,7 @@ const (
 	SubjectFormat                   = "system:serviceaccount:%s:%s"
 )
 
-type bindManager struct {
+type BindManager struct {
 	iamrole.Interface
 	oidcArn string
 	issuer  string
@@ -24,7 +24,7 @@ type bindManager struct {
 
 // Bind will establish a trust relationship between a role and a service account
 // by allowing the service account to AssumeRoleWithWebIdentity
-func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
+func (b *BindManager) Bind(ctx context.Context, binding *Binding) error {
 	sid := sidLabel(binding.Role.Name, binding.Role.Namespace)
 	upstream, err := b.Get(ctx, &iamrole.GetOptions{Name: binding.Role.GetName()})
 	if err != nil {
@@ -101,12 +101,12 @@ func (b *bindManager) Bind(ctx context.Context, binding *Binding) error {
 	return nil
 }
 
-var _ Manager = &bindManager{}
+var _ Manager = &BindManager{}
 
 // New returns a new BindManager instance
-func New(p iamrole.Interface, oidcArn string) *bindManager {
+func New(p iamrole.Interface, oidcArn string) *BindManager {
 	issuer := oidcArn[strings.Index(oidcArn, "/")+1:] + ":sub"
-	return &bindManager{Interface: p, oidcArn: oidcArn, issuer: issuer}
+	return &BindManager{Interface: p, oidcArn: oidcArn, issuer: issuer}
 }
 
 func sidLabel(name, namespace string) string {
