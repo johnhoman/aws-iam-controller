@@ -27,8 +27,6 @@ import (
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
-type versions []iamtypes.PolicyVersion
-
 type Cache struct {
 	Attachments     sync.Map
 	Roles           sync.Map
