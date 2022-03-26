@@ -126,8 +126,11 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		*options = iampolicy.GetOptions{Arn: instance.Status.Arn}
 	}
 	document, err := serializeDocument(instance)
-	iamPolicy, err := r.AWS.Get(ctx, options)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	sum := md5Sum(document)
+	iamPolicy, err := r.AWS.Get(ctx, options)
 	if err != nil {
 		if !aws.IsNotFound(err) {
 			return ctrl.Result{}, err

@@ -103,7 +103,9 @@ var _ = Describe("IamRoleService", func() {
 			RoleName:    aws.String("should-update-the-role"),
 			Description: aws.String("A new description"),
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		out, err := iamService.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String("should-update-the-role")})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(aws.ToString(out.Role.Description)).To(Equal("A new description"))
 	})
 	It("should raise an error when a policy document isn't provided to create", func() {
@@ -140,10 +142,11 @@ var _ = Describe("IamRoleService", func() {
 			RoleName:       aws.String("should-update-assume-role-policy-document"),
 			PolicyDocument: aws.String(document),
 		})
-
+		Expect(err).ShouldNot(HaveOccurred())
 		out, err := iamService.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String("should-update-assume-role-policy-document"),
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		current, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -197,7 +200,7 @@ var _ = Describe("IamRoleService", func() {
 			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
-
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out.AttachedPolicies).Should(HaveLen(1))
 
 		policy, err = iamService.CreatePolicy(ctx, inputCache.Pop("ClientVPNServiceRolePolicy"))
@@ -215,6 +218,7 @@ var _ = Describe("IamRoleService", func() {
 			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out.AttachedPolicies).Should(HaveLen(2))
 
 		detachment, err := iamService.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
@@ -228,6 +232,7 @@ var _ = Describe("IamRoleService", func() {
 			RoleName:   role.Role.RoleName,
 			PathPrefix: role.Role.Path,
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(out.AttachedPolicies).Should(HaveLen(1))
 	})
 	It("should return an error when trying to attach a policy that doesn't exist", func() {

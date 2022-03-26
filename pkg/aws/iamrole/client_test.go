@@ -73,6 +73,7 @@ var _ = Describe("Client", func() {
 		upstream, err := service.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String(role.Name),
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		p, err := url.QueryUnescape(aws.ToString(upstream.Role.AssumeRolePolicyDocument))
 		Expect(err).Should(Succeed())
 		var up map[string]interface{}
@@ -138,6 +139,7 @@ var _ = Describe("Client", func() {
 			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
 			Description: "iam test policy",
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 
 		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
 			Name:      role.Name,
@@ -164,6 +166,7 @@ var _ = Describe("Client", func() {
 			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
 			Description: "iam test policy",
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
 			Name:      role.Name,
 			PolicyArn: p.Arn,
@@ -173,6 +176,7 @@ var _ = Describe("Client", func() {
 			Document:    `{"Version": "2012-10-17", "Statement": [{"Sid": "S3FullAccess"}]}`,
 			Description: "iam test policy",
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(client.AttachPolicy(ctx, &iamrole.AttachOptions{
 			Name:      role.Name,
 			PolicyArn: p.Arn,
@@ -180,6 +184,7 @@ var _ = Describe("Client", func() {
 		policies, err := client.ListAttachedPolicies(ctx, &iamrole.ListOptions{
 			Name: role.Name,
 		})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(policies.Len()).Should(Equal(2))
 	})
 	It("should return error when input is invalid", func() {
