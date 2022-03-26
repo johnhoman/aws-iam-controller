@@ -41,10 +41,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
 	"github.com/johnhoman/aws-iam-controller/controllers"
 	//+kubebuilder:scaffold:imports
+)
+
+const (
+	DefaultWebhookPort = 9443
 )
 
 var (
@@ -65,23 +68,27 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(awsv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	utilruntime.Must(awsv1alpha1.AddToScheme(scheme))
 }
 
+func Exit(code int) { os.Exit(code) }
+
 func main() {
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var webhookPort int
 	var path string
 	var oidcArn string
 	var awsRegion string
 	var awsProfile string
 	var enableWebhook bool
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.IntVar(&webhookPort, "webhook-port", DefaultWebhookPort, "The port to expose the webhook server on")
 	flag.StringVar(&path, "resource-default-path", "", "The path prefix to use for creating IAM resources")
 	flag.StringVar(&oidcArn, "oidc-arn", "", "The EKS cluster oidc provider")
 	flag.StringVar(&awsRegion, "aws-region", "", "aws region")
@@ -102,14 +109,14 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Port:                   webhookPort,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "4b7e85e7.jackhoman.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
@@ -125,12 +132,12 @@ func main() {
 	cfg, err := config.LoadDefaultConfig(ctx, options...)
 	if err != nil {
 		setupLog.Error(err, "unable to load aws credentials")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	if len(oidcArn) == 0 {
 		setupLog.Info("missing required argument -oidc-arn")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	client := iam.NewFromConfig(cfg)
@@ -139,7 +146,7 @@ func main() {
 	raw, err := json.Marshal(denyPolicy)
 	if err != nil {
 		setupLog.Error(err, "unable to marshal provided default policy")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	if err = (&controllers.IamRoleReconciler{
@@ -151,17 +158,17 @@ func main() {
 		Manager:       bindmanager.New(service, oidcArn),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IamRole")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	if enableWebhook {
-		if err = (&v1alpha1.IamRole{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = (&awsv1alpha1.IamRole{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "IamRole")
-			os.Exit(1)
+			Exit(1)
 		}
 		if err = (&awsv1alpha1.IamRoleBinding{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "IamRoleBinding")
-			os.Exit(1)
+			Exit(1)
 		}
 	}
 	if err = (&controllers.IamPolicyReconciler{
@@ -169,22 +176,22 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IamPolicy")
-		os.Exit(1)
+		Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+		Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+		Exit(1)
 	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		Exit(1)
 	}
 }

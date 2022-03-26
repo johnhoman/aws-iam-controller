@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controllers_test
 
 import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/controllers"
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
@@ -61,11 +62,10 @@ var _ = Describe("IamRoleController", func() {
 		raw, err := json.Marshal(policy)
 		Expect(err).To(BeNil())
 
-		Expect((&IamRoleReconciler{
+		Expect((&controllers.IamRoleReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
 			EventRecorder: mgr.GetEventRecorderFor("controller.test"),
-			notify:        &notifier{},
 			DefaultPolicy: string(raw),
 			RoleService:   roleService,
 			Manager:       bm,
@@ -87,7 +87,7 @@ var _ = Describe("IamRoleController", func() {
 			mgr.Eventually().Create(instance).Should(Succeed())
 			instance = &v1alpha1.IamRole{}
 			mgr.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
-				return cu.ContainsFinalizer(obj, Finalizer)
+				return cu.ContainsFinalizer(obj, controllers.Finalizer)
 			}).Should(Succeed())
 		})
 		When("a role binding is created", func() {
@@ -145,7 +145,7 @@ var _ = Describe("IamRoleController", func() {
 			When("it has a finalizer", func() {
 				BeforeEach(func() {
 					mgr.Eventually().GetWhen(key, instance.DeepCopy(), func(obj client.Object) bool {
-						return cu.ContainsFinalizer(obj, Finalizer)
+						return cu.ContainsFinalizer(obj, controllers.Finalizer)
 					}).Should(Succeed())
 				})
 				When("the upstream resource exists", func() {
@@ -163,7 +163,7 @@ var _ = Describe("IamRoleController", func() {
 					})
 					It("Should remove the finalizer", func() {
 						mgr.Eventually().GetWhen(key, instance.DeepCopy(), func(obj client.Object) bool {
-							return !cu.ContainsFinalizer(obj, Finalizer)
+							return !cu.ContainsFinalizer(obj, controllers.Finalizer)
 						}).Should(Succeed())
 					})
 				})
@@ -183,7 +183,7 @@ var _ = Describe("IamRoleController", func() {
 					})
 					It("Should remove the finalizer", func() {
 						mgr.Eventually().GetWhen(key, instance.DeepCopy(), func(obj client.Object) bool {
-							return !cu.ContainsFinalizer(obj, Finalizer)
+							return !cu.ContainsFinalizer(obj, controllers.Finalizer)
 						}).Should(Succeed())
 					})
 				})
@@ -191,14 +191,14 @@ var _ = Describe("IamRoleController", func() {
 			When("it doesn't have a finalizer", func() {
 				JustBeforeEach(func() {
 					mgr.Eventually().GetWhen(key, instance.DeepCopy(), func(obj client.Object) bool {
-						return !cu.ContainsFinalizer(obj, Finalizer)
+						return !cu.ContainsFinalizer(obj, controllers.Finalizer)
 					}).Should(Succeed())
 				})
 				It("Should not add a finalizer", func() {
 					Consistently(func() bool {
 						obj := &v1alpha1.IamRole{}
 						mgr.Expect().Get(key, obj).Should(Succeed())
-						return !cu.ContainsFinalizer(obj, Finalizer)
+						return !cu.ContainsFinalizer(obj, controllers.Finalizer)
 					}).Should(BeTrue())
 				})
 				It("Should not recreate the resource", func() {
@@ -211,14 +211,14 @@ var _ = Describe("IamRoleController", func() {
 		})
 		When("it's not being deleted", func() {
 			It("Adds a finalizer", func() {
-				Expect(instance.Finalizers).Should(And(ContainElement(Finalizer), ContainElement("keep")))
+				Expect(instance.Finalizers).Should(And(ContainElement(controllers.Finalizer), ContainElement("keep")))
 				Expect(instance.ManagedFields[0].Manager).To(Equal("aws-iam-controller"))
 				Expect(instance.ManagedFields[1].Manager).ToNot(Equal("aws-iam-controller"))
 
 				managed := map[string]interface{}{
 					"f:metadata": map[string]interface{}{
 						"f:finalizers": map[string]interface{}{
-							fmt.Sprintf(`v:"%s"`, Finalizer): map[string]interface{}{},
+							fmt.Sprintf(`v:"%s"`, controllers.Finalizer): map[string]interface{}{},
 						},
 					},
 				}
@@ -305,11 +305,10 @@ var _ = Describe("IamRoleController Policy Refs", func() {
 		raw, err := json.Marshal(policy)
 		Expect(err).To(BeNil())
 
-		Expect((&IamRoleReconciler{
+		Expect((&controllers.IamRoleReconciler{
 			Client:        mgr.GetClient(),
 			Scheme:        mgr.GetScheme(),
 			EventRecorder: mgr.GetEventRecorderFor("controller.test"),
-			notify:        &notifier{},
 			DefaultPolicy: string(raw),
 			RoleService:   roleService,
 			Manager:       bm,
@@ -336,7 +335,7 @@ var _ = Describe("IamRoleController Policy Refs", func() {
 			mgr.Eventually().Create(instance).Should(Succeed())
 			instance = &v1alpha1.IamRole{}
 			mgr.Eventually().GetWhen(key, instance, func(obj client.Object) bool {
-				return cu.ContainsFinalizer(obj, Finalizer)
+				return cu.ContainsFinalizer(obj, controllers.Finalizer)
 			}).Should(Succeed())
 		})
 		When("an iam policy exists", func() {

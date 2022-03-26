@@ -27,6 +27,10 @@ import (
 	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
+const (
+	DefaultMaxSessionDuration = 3600
+)
+
 type Cache struct {
 	Attachments     sync.Map
 	Roles           sync.Map
@@ -67,7 +71,7 @@ func (pv *policyVersions) Default() iamtypes.PolicyVersion {
 
 func (pv *policyVersions) Latest() iamtypes.PolicyVersion {
 	policy := &iamtypes.PolicyVersion{
-		CreateDate: aws.Time(time.Now().UTC().Add(time.Second * 3600)),
+		CreateDate: aws.Time(time.Now().UTC().Add(time.Second * DefaultMaxSessionDuration)),
 	}
 	pv.Range(func(key interface{}, value interface{}) bool {
 		v := value.(iamtypes.PolicyVersion)
@@ -100,7 +104,7 @@ func (i *IamService) Reset() {
 		RoleName:                 aws.String("AWSServiceRoleForAmazonEKS"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 		Description:              aws.String("Allows Amazon EKS to call AWS services on your behalf."),
-		MaxSessionDuration:       aws.Int32(3600),
+		MaxSessionDuration:       aws.Int32(DefaultMaxSessionDuration),
 		RoleLastUsed: &iamtypes.RoleLastUsed{
 			LastUsedDate: aws.Time(time.Date(2022, 2, 8, 3, 19, 36, 0, time.UTC)),
 			Region:       aws.String("us-east-1"),
@@ -141,9 +145,11 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+const SuffixLen = 17
+
 func randStringSuffix(p string) string {
 	runes := []rune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, 17)
+	b := make([]rune, SuffixLen)
 	for i := range b {
 		b[i] = runes[rand.Intn(len(runes))]
 	}

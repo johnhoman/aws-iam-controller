@@ -19,7 +19,6 @@ package fake
 import (
 	"context"
 	"fmt"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 	"net/url"
 	"strconv"
 	"strings"
@@ -29,6 +28,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
 )
 
 func (i *IamService) ListPolicies(_ context.Context, params *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
@@ -36,7 +37,7 @@ func (i *IamService) ListPolicies(_ context.Context, params *iam.ListPoliciesInp
 		params = &iam.ListPoliciesInput{}
 	}
 
-	policies := make([]iamtypes.Policy, 0, 10)
+	policies := make([]iamtypes.Policy, 0)
 	i.ManagedPolicies.Range(func(k interface{}, v interface{}) bool {
 		mp := v.(managedPolicy)
 		if params.PathPrefix == nil || aws.ToString(mp.policy.Path) == aws.ToString(params.PathPrefix) {

@@ -1,7 +1,8 @@
-package controllers
+package controllers_test
 
 import (
 	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/controllers"
 	"github.com/johnhoman/controller-tools/manager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,7 +20,7 @@ var _ = Describe("IamRoleBindingController", func() {
 			WithScheme(scheme.Scheme).
 			Complete(cfg)
 
-		err := (&IamRoleBindingReconciler{
+		err := (&controllers.IamRoleBindingReconciler{
 			Client:        it.GetClient(),
 			Scheme:        it.GetScheme(),
 			EventRecorder: it.GetEventRecorderFor("controller.test"),
@@ -77,7 +78,7 @@ var _ = Describe("IamRoleBindingController", func() {
 					it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
 						return len(obj.GetAnnotations()) > 0
 					}).Should(Succeed())
-					Expect(instance.GetAnnotations()).To(HaveKeyWithValue(ServiceAccountAnnotation, iamRoleArn))
+					Expect(instance.GetAnnotations()).To(HaveKeyWithValue(controllers.ServiceAccountAnnotation, iamRoleArn))
 
 				})
 				It("updates the status", func() {
@@ -93,7 +94,7 @@ var _ = Describe("IamRoleBindingController", func() {
 					BeforeEach(func() {
 						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
 							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+							return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
 						}).Should(Succeed())
 					})
 					JustBeforeEach(func() {
@@ -103,7 +104,7 @@ var _ = Describe("IamRoleBindingController", func() {
 						instance := &corev1.ServiceAccount{}
 						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
 							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return !metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+							return !metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
 						}).Should(Succeed())
 					})
 				})
@@ -112,7 +113,7 @@ var _ = Describe("IamRoleBindingController", func() {
 					BeforeEach(func() {
 						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, &corev1.ServiceAccount{}, func(obj client.Object) bool {
 							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+							return metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
 						}).Should(Succeed())
 						other = &corev1.ServiceAccount{
 							ObjectMeta: metav1.ObjectMeta{
@@ -134,7 +135,7 @@ var _ = Describe("IamRoleBindingController", func() {
 						instance := &corev1.ServiceAccount{}
 						it.Eventually().GetWhen(types.NamespacedName{Name: randomName}, instance, func(obj client.Object) bool {
 							meta := obj.(*corev1.ServiceAccount).ObjectMeta
-							return !metav1.HasAnnotation(meta, ServiceAccountAnnotation)
+							return !metav1.HasAnnotation(meta, controllers.ServiceAccountAnnotation)
 						}).Should(Succeed())
 					})
 				})
@@ -156,10 +157,10 @@ var _ = Describe("IamRoleBindingController", func() {
 						instance := &corev1.ServiceAccount{}
 						err := it.Uncached().Get(it.GetContext(), types.NamespacedName{Name: randomName}, instance)
 						if err != nil {
-							return map[string]string{ServiceAccountFinalizer: ""}
+							return map[string]string{controllers.ServiceAccountFinalizer: ""}
 						}
 						return instance.GetAnnotations()
-					}).ShouldNot(HaveKey(ServiceAccountFinalizer))
+					}).ShouldNot(HaveKey(controllers.ServiceAccountFinalizer))
 				})
 			})
 		})

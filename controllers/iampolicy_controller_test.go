@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controllers_test
 
 import (
 	"fmt"
 	"github.com/google/uuid"
 	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/controllers"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/fake"
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 	"github.com/johnhoman/controller-tools/manager"
@@ -33,6 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	IamPolicyFinalizer = controllers.IamPolicyFinalizer
+)
+
 var _ = Describe("IamPolicyController", func() {
 	var it manager.IntegrationTest
 	var service iampolicy.Interface
@@ -42,7 +47,7 @@ var _ = Describe("IamPolicyController", func() {
 			WithScheme(scheme.Scheme).
 			Complete(cfg)
 
-		err := (&IamPolicyReconciler{
+		err := (&controllers.IamPolicyReconciler{
 			Client:        it.GetClient(),
 			Scheme:        it.GetScheme(),
 			EventRecorder: it.GetEventRecorderFor("controller.test"),

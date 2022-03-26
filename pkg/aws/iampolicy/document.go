@@ -31,68 +31,68 @@ type Document interface {
 }
 
 type Conditions struct {
-	ArnLike                           map[string][]string `json:",omitempty"`
-	ArnLikeIfExists                   map[string][]string `json:",omitempty"`
-	ArnNotLike                        map[string][]string `json:",omitempty"`
-	ArnNotLikeIfExists                map[string][]string `json:",omitempty"`
-	BinaryEquals                      map[string][]string `json:",omitempty"`
-	BinaryEqualsIfExists              map[string][]string `json:",omitempty"`
-	Bool                              map[string][]string `json:",omitempty"`
-	BoolIfExists                      map[string][]string `json:",omitempty"`
-	DateEquals                        map[string][]string `json:",omitempty"`
-	DateEqualsIfExists                map[string][]string `json:",omitempty"`
-	DateNotEquals                     map[string][]string `json:",omitempty"`
-	DateNotEqualsIfExists             map[string][]string `json:",omitempty"`
-	DateLessThan                      map[string][]string `json:",omitempty"`
-	DateLessThanIfExists              map[string][]string `json:",omitempty"`
-	DateLessThanEquals                map[string][]string `json:",omitempty"`
-	DateLessThanEqualsIfExists        map[string][]string `json:",omitempty"`
-	DateGreaterThan                   map[string][]string `json:",omitempty"`
-	DateGreaterThanIfExists           map[string][]string `json:",omitempty"`
-	DateGreaterThanEquals             map[string][]string `json:",omitempty"`
-	DateGreaterThanEqualsIfExists     map[string][]string `json:",omitempty"`
-	IpAddress                         map[string][]string `json:",omitempty"`
-	IpAddressIfExists                 map[string][]string `json:",omitempty"`
-	NotIpAddress                      map[string][]string `json:",omitempty"`
-	NotIpAddressIfExists              map[string][]string `json:",omitempty"`
-	NumericEquals                     map[string][]string `json:",omitempty"`
-	NumericEqualsIfExists             map[string][]string `json:",omitempty"`
-	NumericNotEquals                  map[string][]string `json:",omitempty"`
-	NumericNotEqualsIfExists          map[string][]string `json:",omitempty"`
-	NumericLessThan                   map[string][]string `json:",omitempty"`
-	NumericLessThanIfExists           map[string][]string `json:",omitempty"`
-	NumericLessThanEquals             map[string][]string `json:",omitempty"`
-	NumericLessThanEqualsIfExists     map[string][]string `json:",omitempty"`
-	NumericGreaterThan                map[string][]string `json:",omitempty"`
-	NumericGreaterThanIfExists        map[string][]string `json:",omitempty"`
-	NumericGreaterThanEquals          map[string][]string `json:",omitempty"`
-	NumericGreaterThanEqualsIfExists  map[string][]string `json:",omitempty"`
-	Null                              map[string][]string `json:",omitempty"`
-	StringLike                        map[string][]string `json:",omitempty"`
-	StringLikeIfExists                map[string][]string `json:",omitempty"`
-	StringNotLike                     map[string][]string `json:",omitempty"`
-	StringNotLikeIfExists             map[string][]string `json:",omitempty"`
-	StringEquals                      map[string][]string `json:",omitempty"`
-	StringEqualsIfExists              map[string][]string `json:",omitempty"`
-	StringNotEquals                   map[string][]string `json:",omitempty"`
-	StringNotEqualsIfExists           map[string][]string `json:",omitempty"`
-	StringEqualsIgnoreCase            map[string][]string `json:",omitempty"`
-	StringEqualsIgnoreCaseIfExists    map[string][]string `json:",omitempty"`
-	StringNotEqualsIgnoreCase         map[string][]string `json:",omitempty"`
-	StringNotEqualsIgnoreCaseIfExists map[string][]string `json:",omitempty"`
+	ArnLike                           map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	ArnLikeIfExists                   map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	ArnNotLike                        map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	ArnNotLikeIfExists                map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	BinaryEquals                      map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	BinaryEqualsIfExists              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	Bool                              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	BoolIfExists                      map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateEquals                        map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateEqualsIfExists                map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateNotEquals                     map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateNotEqualsIfExists             map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateLessThan                      map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateLessThanIfExists              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateLessThanEquals                map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateLessThanEqualsIfExists        map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateGreaterThan                   map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateGreaterThanIfExists           map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateGreaterThanEquals             map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	DateGreaterThanEqualsIfExists     map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	IpAddress                         map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	IpAddressIfExists                 map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NotIpAddress                      map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NotIpAddressIfExists              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericEquals                     map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericEqualsIfExists             map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericNotEquals                  map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericNotEqualsIfExists          map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericLessThan                   map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericLessThanIfExists           map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericLessThanEquals             map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericLessThanEqualsIfExists     map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericGreaterThan                map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericGreaterThanIfExists        map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericGreaterThanEquals          map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	NumericGreaterThanEqualsIfExists  map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	Null                              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringLike                        map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringLikeIfExists                map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotLike                     map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotLikeIfExists             map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringEquals                      map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringEqualsIfExists              map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotEquals                   map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotEqualsIfExists           map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringEqualsIgnoreCase            map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringEqualsIgnoreCaseIfExists    map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotEqualsIgnoreCase         map[string][]string `json:",omitempty"` // nolint: tagliatelle
+	StringNotEqualsIgnoreCaseIfExists map[string][]string `json:",omitempty"` // nolint: tagliatelle
 }
 
 type Statement struct {
-	Sid        string      `json:",omitempty"`
+	Sid        string      `json:",omitempty"` // nolint: tagliatelle
 	Effect     string      // Allow/Deny
-	Action     interface{} `json:",omitempty"` // this can also be a string
-	Resource   interface{} // this can also be a string
-	Conditions *Conditions `json:"Condition,omitempty"`
+	Action     interface{} `json:",omitempty"` // nolint: tagliatelle
+	Resource   interface{}
+	Conditions *Conditions `json:"Condition,omitempty"` // nolint: tagliatelle
 }
 
 type document struct {
 	Version    string
-	Statements []Statement `json:"Statement"`
+	Statements []Statement `json:"Statement"` // nolint: tagliatelle
 }
 
 func (d *document) Marshal() (string, error) {

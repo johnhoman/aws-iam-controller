@@ -30,7 +30,11 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-func (i *IamService) UpdateAssumeRolePolicy(_ context.Context, params *iam.UpdateAssumeRolePolicyInput, _ ...func(options *iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
+func (i *IamService) UpdateAssumeRolePolicy(
+	_ context.Context,
+	params *iam.UpdateAssumeRolePolicyInput,
+	_ ...func(options *iam.Options),
+) (*iam.UpdateAssumeRolePolicyOutput, error) {
 	iRole, _ := i.Roles.Load(aws.ToString(params.RoleName))
 	role := iRole.(*iamtypes.Role)
 	role.AssumeRolePolicyDocument = aws.String(url.QueryEscape(*params.PolicyDocument))
@@ -38,7 +42,11 @@ func (i *IamService) UpdateAssumeRolePolicy(_ context.Context, params *iam.Updat
 	return &iam.UpdateAssumeRolePolicyOutput{}, nil
 }
 
-func (i *IamService) UpdateRole(_ context.Context, params *iam.UpdateRoleInput, _ ...func(*iam.Options)) (*iam.UpdateRoleOutput, error) {
+func (i *IamService) UpdateRole(
+	_ context.Context,
+	params *iam.UpdateRoleInput,
+	_ ...func(*iam.Options),
+) (*iam.UpdateRoleOutput, error) {
 	iRole, _ := i.Roles.Load(aws.ToString(params.RoleName))
 	role := iRole.(*iamtypes.Role)
 	if params.Description != nil {
@@ -51,7 +59,11 @@ func (i *IamService) UpdateRole(_ context.Context, params *iam.UpdateRoleInput, 
 	return &iam.UpdateRoleOutput{}, nil
 }
 
-func (i *IamService) GetRole(_ context.Context, params *iam.GetRoleInput, _ ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+func (i *IamService) GetRole(
+	_ context.Context,
+	params *iam.GetRoleInput,
+	_ ...func(*iam.Options),
+) (*iam.GetRoleOutput, error) {
 
 	iRole, ok := i.Roles.Load(aws.ToString(params.RoleName))
 	if !ok {
@@ -60,7 +72,11 @@ func (i *IamService) GetRole(_ context.Context, params *iam.GetRoleInput, _ ...f
 	return &iam.GetRoleOutput{Role: iRole.(*iamtypes.Role)}, nil
 }
 
-func (i *IamService) CreateRole(_ context.Context, params *iam.CreateRoleInput, _ ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
+func (i *IamService) CreateRole(
+	_ context.Context,
+	params *iam.CreateRoleInput,
+	_ ...func(*iam.Options),
+) (*iam.CreateRoleOutput, error) {
 	_, ok := i.Roles.Load(aws.ToString(params.RoleName))
 	if ok {
 		return nil, &iamtypes.EntityAlreadyExistsException{}
@@ -101,7 +117,11 @@ func (i *IamService) CreateRole(_ context.Context, params *iam.CreateRoleInput, 
 	return &iam.CreateRoleOutput{Role: iamRole}, nil
 }
 
-func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, _ ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
+func (i *IamService) DeleteRole(
+	_ context.Context,
+	params *iam.DeleteRoleInput,
+	_ ...func(*iam.Options),
+) (*iam.DeleteRoleOutput, error) {
 	_, ok := i.Roles.Load(aws.ToString(params.RoleName))
 	if !ok {
 		return nil, &iamtypes.NoSuchEntityException{}
@@ -111,7 +131,11 @@ func (i *IamService) DeleteRole(_ context.Context, params *iam.DeleteRoleInput, 
 	return &iam.DeleteRoleOutput{}, nil
 }
 
-func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRolePolicyInput, _ ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error) {
+func (i *IamService) AttachRolePolicy(
+	_ context.Context,
+	params *iam.AttachRolePolicyInput,
+	_ ...func(*iam.Options),
+) (*iam.AttachRolePolicyOutput, error) {
 	if params == nil {
 		params = &iam.AttachRolePolicyInput{}
 	}
@@ -133,7 +157,11 @@ func (i *IamService) AttachRolePolicy(_ context.Context, params *iam.AttachRoleP
 	return &iam.AttachRolePolicyOutput{}, nil
 }
 
-func (i *IamService) DetachRolePolicy(_ context.Context, params *iam.DetachRolePolicyInput, _ ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error) {
+func (i *IamService) DetachRolePolicy(
+	_ context.Context,
+	params *iam.DetachRolePolicyInput,
+	_ ...func(*iam.Options),
+) (*iam.DetachRolePolicyOutput, error) {
 	rv := &iam.DetachRolePolicyOutput{}
 	if params == nil {
 		params = &iam.DetachRolePolicyInput{}
