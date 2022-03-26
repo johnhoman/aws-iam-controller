@@ -27,5 +27,3 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - uses: golangci/golangci-lint-action@v2
-        with:
-          skip-cache: true
