@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
+const DefaultCacheSize = 128
+
 type Client struct {
 	service   pkgaws.IamPolicyService
 	path      string
@@ -171,7 +173,7 @@ func (c *Client) Delete(ctx context.Context, options *DeleteOptions) error {
 var _ Interface = &Client{}
 
 func New(service pkgaws.IamPolicyService, path string) *Client {
-	cache, _ := lru.New(128)
+	cache, _ := lru.New(DefaultCacheSize)
 	return &Client{
 		service:   service,
 		path:      fmt.Sprintf("/%s/", path),

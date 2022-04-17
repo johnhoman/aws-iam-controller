@@ -143,12 +143,12 @@ func (d *document) unmarshal(s string) error {
 	return nil
 }
 
-func NewDocument() Document {
+func NewDocument() *document {
 	return &document{Version: "2012-10-17"}
 }
 
-func NewDocumentFromString(doc string) (Document, error) {
-	d := NewDocument().(*document)
+func NewDocumentFromString(doc string) (*document, error) {
+	d := NewDocument()
 	if err := d.unmarshal(doc); err != nil {
 		return nil, err
 	}
