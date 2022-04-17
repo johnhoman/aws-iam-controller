@@ -77,15 +77,15 @@ func Exit(code int) { os.Exit(code) }
 func main() {
 
 	var (
-	    metricsAddr string
-	    enableLeaderElection bool
-	    probeAddr string
-	    webhookPort int
-	    path string
-	    oidcArn string
-	    awsRegion string
-	    awsProfile string
-	    enableWebhook bool
+		metricsAddr          string
+		enableLeaderElection bool
+		probeAddr            string
+		webhookPort          int
+		path                 string
+		oidcArn              string
+		awsRegion            string
+		awsProfile           string
+		enableWebhook        bool
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
