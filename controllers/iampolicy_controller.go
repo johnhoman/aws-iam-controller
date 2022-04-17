@@ -21,22 +21,22 @@ import (
 	"crypto/md5"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	awsv1alpha1 "github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
 )
 
 // IamPolicyReconciler reconciles a IamPolicy object
@@ -63,60 +63,20 @@ const (
 func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	instance := &awsv1alpha1.IamPolicy{}
+	instance := &v1alpha1.IamPolicy{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		logger.Info("unable to get instance")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if !instance.GetDeletionTimestamp().IsZero() {
-		if controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
-			// Remove the Iam Policy
-			// - Check the status for an ARN
-			options := &iampolicy.GetOptions{Arn: instance.Status.Arn}
-			if len(instance.Status.Arn) == 0 {
-				options = &iampolicy.GetOptions{Name: instance.GetName()}
-			}
-			iamPolicy, err := r.AWS.Get(ctx, options)
-			if err != nil && !aws.IsNotFound(err) {
-				logger.Error(err, "unable to get iam policy for deletion")
-				return ctrl.Result{}, err
-			} else {
-				if !aws.IsNotFound(err) {
-					if err := r.AWS.Delete(ctx, &iampolicy.DeleteOptions{Arn: iamPolicy.Arn}); err != nil {
-						logger.Error(err, "unable to delete iam policy", "arn", iamPolicy.Arn)
-						return ctrl.Result{}, err
-					}
-					logger.Info("deleted resource", "arn", iamPolicy.Arn)
-					r.Eventf(instance, corev1.EventTypeNormal, "Deleted", "Deleted iam policy %s", iamPolicy.Arn)
-				}
-			}
-
-			patch := client.MergeFrom(instance.DeepCopy())
-			controllerutil.RemoveFinalizer(instance, IamPolicyFinalizer)
-			if err := r.Client.Patch(ctx, instance, patch); err != nil {
-				logger.Error(err, "unable to remove finalizer")
-				return ctrl.Result{}, err
-			}
-			logger.Info("removed finalizer")
-		}
-		return ctrl.Result{}, nil
+		return r.Finalize(ctx, instance)
 	}
 
 	if !controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
-		patch := &unstructured.Unstructured{Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers": []string{IamPolicyFinalizer},
-			},
-		}}
-		patch.SetName(instance.GetName())
-		patch.SetGroupVersionKind(instance.GroupVersionKind())
-		if err := r.Client.Patch(ctx, patch, client.Apply, client.FieldOwner("aws-iam-policy-controller")); err != nil {
-			logger.Error(err, "unable to patch finalizer", "finalizer", IamPolicyFinalizer)
-			logger.Info("finalizer not added")
+		if err := r.addFinalizer(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
-		logger.Info("added finalizer", "finalizer", IamPolicyFinalizer)
 	}
 	// Create the iam policy
 	options := &iampolicy.GetOptions{Name: instance.GetName()}
@@ -156,7 +116,7 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err := r.Client.Status().Patch(ctx, patch, client.Apply, IamPolicyFieldOwner, client.ForceOwnership); err != nil {
 			logger.Error(err, "unable to patch status on create")
 		}
-		r.Eventf(instance, corev1.EventTypeNormal, "Created", "Created iam policy %s", iamPolicy.Arn)
+		r.Eventf(instance, v1.EventTypeNormal, "Created", "Created iam policy %s", iamPolicy.Arn)
 	}
 	if sum != instance.Status.Md5Sum {
 		iamPolicy, err = r.AWS.Update(ctx, &iampolicy.UpdateOptions{
@@ -178,10 +138,10 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			logger.Error(err, "unable to update status after policy document update")
 			return ctrl.Result{}, err
 		}
-		r.Eventf(instance, corev1.EventTypeNormal, "Updated", "Updated iam policy %s", iamPolicy.Arn)
+		r.Eventf(instance, v1.EventTypeNormal, "Updated", "Updated iam policy %s", iamPolicy.Arn)
 	}
 
-	matchingRolesList := &awsv1alpha1.IamRoleList{}
+	matchingRolesList := &v1alpha1.IamRoleList{}
 	if err := r.Client.List(ctx, matchingRolesList, client.MatchingFields{"spec.policyRefs": instance.GetName()}); err != nil {
 		logger.Error(err, "unable to list iam roles")
 	}
@@ -196,9 +156,9 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 	if referenced.Difference(existing).Len() > 0 || existing.Difference(referenced).Len() > 0 {
 		logger.Info(fmt.Sprintf("sync attached roles - have %d, found %d", existing.Len(), referenced.Len()))
-		refs := make([]corev1.ObjectReference, 0, len(referenced))
+		refs := make([]v1.ObjectReference, 0, len(referenced))
 		for _, name := range referenced.List() {
-			refs = append(refs, corev1.ObjectReference{Name: name})
+			refs = append(refs, v1.ObjectReference{Name: name})
 		}
 		patch := client.MergeFrom(instance.DeepCopy())
 		instance.Status.AttachedRoles = refs
@@ -213,10 +173,64 @@ func (r *IamPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
+func (r *IamPolicyReconciler) Finalize(ctx context.Context, obj client.Object) (ctrl.Result, error) {
+	instance := obj.(*v1alpha1.IamPolicy)
+	logger := log.FromContext(ctx).WithName("iam-policy-reconciler.finalize")
+	if controllerutil.ContainsFinalizer(instance, IamPolicyFinalizer) {
+		// Remove the Iam Policy
+		// - Check the status for an ARN
+		options := &iampolicy.GetOptions{Arn: instance.Status.Arn}
+		if len(instance.Status.Arn) == 0 {
+			options = &iampolicy.GetOptions{Name: instance.GetName()}
+		}
+		iamPolicy, err := r.AWS.Get(ctx, options)
+		if err != nil && !aws.IsNotFound(err) {
+			logger.Error(err, "unable to get iam policy for deletion")
+			return ctrl.Result{}, err
+		} else {
+			if !aws.IsNotFound(err) {
+				if err := r.AWS.Delete(ctx, &iampolicy.DeleteOptions{Arn: iamPolicy.Arn}); err != nil {
+					logger.Error(err, "unable to delete iam policy", "arn", iamPolicy.Arn)
+					return ctrl.Result{}, err
+				}
+				logger.Info("deleted resource", "arn", iamPolicy.Arn)
+				r.Eventf(instance, v1.EventTypeNormal, "Deleted", "Deleted iam policy %s", iamPolicy.Arn)
+			}
+		}
+
+		patch := client.MergeFrom(instance.DeepCopy())
+		controllerutil.RemoveFinalizer(instance, IamPolicyFinalizer)
+		if err := r.Client.Patch(ctx, instance, patch); err != nil {
+			logger.Error(err, "unable to remove finalizer")
+			return ctrl.Result{}, err
+		}
+		logger.Info("removed finalizer")
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *IamPolicyReconciler) addFinalizer(ctx context.Context, instance *v1alpha1.IamPolicy) error {
+	logger := log.FromContext(ctx)
+	patch := &unstructured.Unstructured{Object: map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"finalizers": []string{IamPolicyFinalizer},
+		},
+	}}
+	patch.SetName(instance.GetName())
+	patch.SetGroupVersionKind(instance.GroupVersionKind())
+	if err := r.Client.Patch(ctx, patch, client.Apply, client.FieldOwner("aws-iam-policy-controller")); err != nil {
+		logger.Error(err, "unable to patch finalizer", "finalizer", IamPolicyFinalizer)
+		logger.Info("finalizer not added")
+		return err
+	}
+	logger.Info("added finalizer", "finalizer", IamPolicyFinalizer)
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &awsv1alpha1.IamRole{}, "spec.policyRefs", func(obj client.Object) []string {
-		role, ok := obj.(*awsv1alpha1.IamRole)
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1alpha1.IamRole{}, "spec.policyRefs", func(obj client.Object) []string {
+		role, ok := obj.(*v1alpha1.IamRole)
 		if !ok {
 			return []string{}
 		}
@@ -229,11 +243,11 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&awsv1alpha1.IamPolicy{}).
+		For(&v1alpha1.IamPolicy{}).
 		Watches(
-			&source.Kind{Type: &awsv1alpha1.IamRole{}},
+			&source.Kind{Type: &v1alpha1.IamRole{}},
 			handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []ctrl.Request {
-				role := obj.(*awsv1alpha1.IamRole)
+				role := obj.(*v1alpha1.IamRole)
 				rv := make([]ctrl.Request, 0)
 				for _, item := range role.Spec.PolicyRefs {
 					rv = append(rv, ctrl.Request{NamespacedName: types.NamespacedName{Name: item.Name}})
@@ -244,7 +258,7 @@ func (r *IamPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func toMap(conditions []awsv1alpha1.Condition) map[string][]string {
+func toMap(conditions []v1alpha1.Condition) map[string][]string {
 	m := map[string][]string{}
 	for _, condition := range conditions {
 		m[condition.Key] = condition.Values
@@ -252,7 +266,7 @@ func toMap(conditions []awsv1alpha1.Condition) map[string][]string {
 	return m
 }
 
-func serializeDocument(instance *awsv1alpha1.IamPolicy) (string, error) {
+func serializeDocument(instance *v1alpha1.IamPolicy) (string, error) {
 	doc := iampolicy.NewDocument()
 	// TODO: use version
 	statements := make(
