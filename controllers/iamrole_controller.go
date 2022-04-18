@@ -20,24 +20,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
-	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
+	"reflect"
+
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 )
 
 const (
