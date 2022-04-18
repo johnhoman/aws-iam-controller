@@ -16,6 +16,11 @@ func Test_SidLabel(t *testing.T) {
             "jhoman",
             "AllowServiceAccountJhomanDefaultEditor",
         },
+        {
+            "default-editor",
+            "test-workspace-namespace",
+            "AllowServiceAccountTestWorkspaceNamespaceDefaultEditor",
+        },
     }
 
     for _, subtest := range tests {
