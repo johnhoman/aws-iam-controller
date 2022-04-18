@@ -3,8 +3,11 @@ package bindmanager
 import (
 	"context"
 	"fmt"
+	"golang.org/x/text/language"
 	"reflect"
 	"strings"
+
+	"golang.org/x/text/cases"
 
 	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
 )
@@ -12,7 +15,7 @@ import (
 const (
 	EffectAllow                     = "Allow"
 	ActionAssumeRoleWithWebIdentity = "sts:AssumeRoleWithWebIdentity"
-	SidLabelFormat                  = "AllowServiceAccount-%s-%s"
+	SidLabelFormat                  = "Allow Service Account %s %s"
 	SubjectFormat                   = "system:serviceaccount:%s:%s"
 )
 
@@ -109,18 +112,17 @@ func New(p iamrole.Interface, oidcArn string) *BindManager {
 	return &BindManager{Interface: p, oidcArn: oidcArn, issuer: issuer}
 }
 
-func sidLabel(name, namespace string) string {
-	sid := fmt.Sprintf(SidLabelFormat, namespace, name)
-	sid = strings.ReplaceAll(sid, "-", " ")
-	sid = strings.Title(sid)
-	sid = strings.ReplaceAll(sid, " ", "")
-	return sid
-}
 
 func serviceAccountFormat(namespace, name string) string {
 	return fmt.Sprintf(SubjectFormat, namespace, name)
 }
 
-func SidLabel(name, namespace string) string {
-	return sidLabel(name, namespace)
+func sidLabel(name, namespace string) string {
+	sid := fmt.Sprintf(SidLabelFormat, namespace, name)
+	sid = strings.ReplaceAll(sid, "-", " ")
+	sid = cases.Title(language.English).String(sid)
+	sid = strings.ReplaceAll(sid, " ", "")
+	return sid
 }
+
+func SidLabel(name, namespace string) string { return sidLabel(name, namespace) }
