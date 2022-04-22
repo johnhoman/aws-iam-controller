@@ -16,7 +16,11 @@ spec:
     singular: iamrole
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.arn
+      name: ARN
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: IamRole is the Schema for the iamroles API
