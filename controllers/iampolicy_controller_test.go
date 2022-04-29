@@ -132,7 +132,7 @@ var _ = Describe("IamPolicyController", func() {
 				patch := client.MergeFrom(iamRole.DeepCopy())
 				iamRole.Spec.PolicyRefs = []corev1.ObjectReference{}
 				Expect(it.Uncached().Patch(it.GetContext(), iamRole, patch)).Should(Succeed())
-				it.Eventually().GetWhen(types.NamespacedName{Name: iamRole.GetName()}, iamRole, func(obj client.Object) bool {
+				it.Eventually().GetWhen(client.ObjectKeyFromObject(iamRole), iamRole, func(obj client.Object) bool {
 					return len(obj.(*awsv1alpha1.IamRole).Spec.PolicyRefs) == 0
 				}).Should(Succeed())
 				it.Eventually().GetWhen(key, &awsv1alpha1.IamPolicy{}, func(obj client.Object) bool {

@@ -112,7 +112,6 @@ func New(p iamrole.Interface, oidcArn string) *BindManager {
 	return &BindManager{Interface: p, oidcArn: oidcArn, issuer: issuer}
 }
 
-
 func serviceAccountFormat(namespace, name string) string {
 	return fmt.Sprintf(SubjectFormat, namespace, name)
 }
