@@ -45,7 +45,7 @@ import (
 {
   "Effect": "Allow",
   "Principal": {
-    "Federated": "arn:aws:iam::your-account-id:oidc-provider/oidc.eks.your-region-code.amazonaws.com/id/EXAMPLE_OIDC_IDENTIFIER"
+    "Federated": "arn:aws:iam::your-account-id:oidc-provider/oidc.eks.your-region-code.amazonaws.com/id/1234568292"
   },
   "Action": "sts:AssumeRoleWithWebIdentity",
   "Condition": {

@@ -18,14 +18,11 @@ package controllers_test
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
-	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
-	"github.com/johnhoman/aws-iam-controller/controllers"
-	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
-	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
-	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 	"github.com/johnhoman/controller-tools/manager"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,8 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cu "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/johnhoman/aws-iam-controller/api/v1alpha1"
+	"github.com/johnhoman/aws-iam-controller/controllers"
+	pkgaws "github.com/johnhoman/aws-iam-controller/pkg/aws"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iampolicy"
+	"github.com/johnhoman/aws-iam-controller/pkg/aws/iamrole"
+	"github.com/johnhoman/aws-iam-controller/pkg/bindmanager"
 )
 
 var _ = Describe("IamRoleController", func() {
