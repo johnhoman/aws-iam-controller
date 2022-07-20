@@ -12,7 +12,7 @@ to run this controller
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml
 ```
 
-The webhook server uses self-signed certificates (via lets-encrypt) that the Kubernetes API service
+The webhook server uses self-signed certificates that the Kubernetes API service
 trusts because the CA is injected into the webhook configurations
 
 
